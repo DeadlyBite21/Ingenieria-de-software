@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const jwt = require('jsonwebtoken');
+
 
 const app = express();
 app.use(cors());
@@ -16,6 +18,54 @@ const pool = new Pool({
 // RUTA DE PRUEBA
 app.get('/', (req, res) => {
   res.send('API conectada a Neon 🚀');
+});
+
+// RUTA: Inicio de sesión
+app.post('/api/login', async (req, res) => {
+  const { rut, contraseña } = req.body;
+
+  try {
+    // Buscar usuario por RUT
+    const result = await pool.query(
+      'SELECT * FROM usuarios WHERE rut = $1',
+      [rut]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Usuario no encontrado' });
+    }
+
+    const usuario = result.rows[0];
+
+    // Comparar contraseña
+    const validPassword = await bcrypt.compare(contraseña, usuario.contraseña);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
+
+    // (Opcional) generar token JWT
+    const token = jwt.sign(
+      { id: usuario.id, rut: usuario.rut, rol: usuario.rol },
+      process.env.JWT_SECRET || 'secreto123',
+      { expiresIn: '1h' }
+    );
+
+    res.json({
+      message: 'Inicio de sesión exitoso 🚀',
+      usuario: {
+        id: usuario.id,
+        rut: usuario.rut,
+        nombre: usuario.nombre,
+        correo: usuario.correo,
+        rol: usuario.rol
+      },
+      token
+    });
+
+  } catch (err) {
+    console.error('Error en login:', err);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
 });
 
 // RUTA: obtener todos los usuarios
