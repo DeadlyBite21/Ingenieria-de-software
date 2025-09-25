@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
 });
 
 // RUTA: obtener todos los usuarios
-app.get('/usuarios', async (req, res) => {
+app.get('/api/usuarios', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM usuarios');
     res.json(result.rows);
@@ -30,16 +30,21 @@ app.get('/usuarios', async (req, res) => {
 });
 
 // RUTA: crear usuario
-app.post('/usuarios', async (req, res) => {
-  const { nombre, email } = req.body;
+app.post('/api/usuarios/crear', async (req, res) => {
+
+  const { rol, rut, nombre, correo, contraseña } = req.body;
+
+  if(rol !== 0){
+    return res.status(400).json({ error: 'El usuario no es administrador' });
+  }
   try {
     const result = await pool.query(
-      'INSERT INTO usuarios (nombre, email) VALUES ($1, $2) RETURNING *',
-      [nombre, email]
+      'INSERT INTO usuarios (rol, rut, nombre, correo, contraseña) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [rol, rut, nombre, correo, contraseña]
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    console.error('Error en la query:', err);
     res.status(500).json({ error: 'Error al insertar usuario' });
   }
 });
