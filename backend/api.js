@@ -99,6 +99,79 @@ app.post('/api/usuarios/crear', async (req, res) => {
   }
 });
 
+// Crear curso
+app.post('/api/cursos/crear', async (req, res) => {
+  const { nombre } = req.body;
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO cursos (nombre) VALUES ($1) RETURNING *',
+      [nombre]
+    );
+
+    res.status(201).json({
+      message: 'Curso creado con éxito 🚀',
+      curso: result.rows[0]
+    });
+  } catch (err) {
+    if (err.code === '23505') { // UNIQUE violation en PostgreSQL
+      return res.status(400).json({ error: 'El curso ya existe' });
+    }
+    console.error('Error al crear curso:', err);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+// Obtener todos los cursos
+app.get('/api/cursos', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM cursos ORDER BY id');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Error al obtener cursos' });
+  }
+});
+
+// Asignar usuario a un curso (solo rol=2)
+app.post('/cursos/:cursoId/usuarios/:usuarioId', async (req, res) => {
+  const { cursoId, usuarioId } = req.params;
+
+  try {
+    // Verificar que el usuario tenga rol=2
+    const userCheck = await pool.query(
+      'SELECT * FROM usuarios WHERE id = $1',
+      [usuarioId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const usuario = userCheck.rows[0];
+    if (usuario.rol !== 2) {
+      return res.status(400).json({ error: 'Solo usuarios con rol=2 pueden asignarse a cursos' });
+    }
+
+    // Insertar en curso_usuarios
+    const result = await pool.query(
+      'INSERT INTO curso_usuarios (usuario_id, curso_id) VALUES ($1, $2) RETURNING *',
+      [usuarioId, cursoId]
+    );
+
+    res.json({
+      message: 'Usuario asignado al curso con éxito 🚀',
+      asignacion: result.rows[0]
+    });
+
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'El usuario ya está en este curso' });
+    }
+    console.error('Error en asignación:', err);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
