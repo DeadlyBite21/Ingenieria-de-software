@@ -1,10 +1,15 @@
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 function LoginForm() {
   const [rut, setRut] = useState("");
-  const [contraseña, setContraseña] = useState("");
+  const [contrasena, setContrasena] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -12,24 +17,11 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rut, contraseña }),
-      });
-
-      const data = await res.json();
-      setLoading(false);
-
-      if (!res.ok) throw new Error(data.error);
-
-      // Guardar token en localStorage
-      localStorage.setItem("token", data.token);
-
-      alert("Login exitoso 🚀");
-      window.location.href = "/dashboard"; // redirige
+      await login(rut, contrasena);
+      navigate("/dashboard"); // Usar React Router en lugar de window.location
     } catch (err) {
       setError(err.message);
+    } finally {
       setLoading(false);
     }
   };
@@ -58,8 +50,8 @@ function LoginForm() {
       <input
         type="password"
         placeholder="Contraseña"
-        value={contraseña}
-        onChange={(e) => setContraseña(e.target.value)}
+        value={contrasena}
+        onChange={(e) => setContrasena(e.target.value)}
         required
       />
 
