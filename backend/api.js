@@ -141,6 +141,7 @@ app.post('/api/usuarios/crear', authenticateToken, async (req, res) => {
   if(req.user.rol !== 0){
     return res.status(403).json({ error: 'Solo los administradores pueden crear usuarios' });
   }
+  
   try {
     // Encriptar contraseña
     const hashedPassword = await bcrypt.hash(contrasena, 10);
@@ -150,6 +151,12 @@ app.post('/api/usuarios/crear', authenticateToken, async (req, res) => {
       [rol, rut, nombre, correo, hashedPassword]
     );
     res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error al crear usuario:', err);
+    res.status(500).json({ error: 'Error al crear usuario' });
+  }
+});
+
 // RUTA: eliminar usuario (solo administradores)
 app.delete('/api/usuarios/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
@@ -173,35 +180,6 @@ app.delete('/api/usuarios/:id', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error al eliminar usuario:', err);
     res.status(500).json({ error: 'Error al eliminar usuario' });
-  }
-});
-
-// Middleware de autenticacion
-const autenticacionToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if(!token){
-    return res.status(401).json({ error: 'Token no proporcionado' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET || 'secreto123', (err, user) => {
-    if(err) return res.status(403).json({ error: 'Token inválido' });
-    req.user = user;
-    next();
-  });
-};
-
-// RUTA: obtener perfil del usuario autenticado
-app.get('/api/me', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, rut, nombre, correo, rol FROM usuarios WHERE id = $1',
-      [req.user.id]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Error al obtener perfil' });
   }
 });
 
@@ -240,154 +218,6 @@ app.get('/api/cursos', authenticateToken, async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener cursos' });
-  }
-});
-
-// Asignar usuario a un curso (solo administradores)
-app.post('/api/cursos/:cursoId/usuarios/:usuarioId', authenticateToken, async (req, res) => {
-  const { cursoId, usuarioId } = req.params;
-
-  // Verificar que quien hace la petición es administrador
-  if(req.user.rol !== 0){
-    return res.status(403).json({ error: 'Solo los administradores pueden asignar usuarios a cursos' });
-  }
-
-  try {
-    // Verificar que el usuario existe
-    const userCheck = await pool.query(
-      'SELECT * FROM usuarios WHERE id = $1',
-      [usuarioId]
-    );
-
-    if (userCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-
-    // Verificar que el curso existe
-    const courseCheck = await pool.query(
-      'SELECT * FROM cursos WHERE id = $1',
-      [cursoId]
-    );
-
-    if (courseCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Curso no encontrado' });
-    }
-
-    // Insertar en curso_usuarios
-    const result = await pool.query(
-      'INSERT INTO curso_usuarios (usuario_id, curso_id) VALUES ($1, $2) RETURNING *',
-      [usuarioId, cursoId]
-    );
-
-    res.json({
-      message: 'Usuario asignado al curso con éxito 🚀',
-      asignacion: result.rows[0]
-    });
-
-  } catch (err) {
-    if (err.code === '23505') {
-      return res.status(400).json({ error: 'El usuario ya está en este curso' });
-    }
-    console.error('Error en asignación:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
-  }
-});
-
-// Desasignar usuario de un curso (solo administradores)
-app.delete('/api/cursos/:cursoId/usuarios/:usuarioId', authenticateToken, async (req, res) => {
-  const { cursoId, usuarioId } = req.params;
-
-  // Verificar que quien hace la petición es administrador
-  if(req.user.rol !== 0){
-    return res.status(403).json({ error: 'Solo los administradores pueden desasignar usuarios de cursos' });
-  }
-
-  try {
-    const result = await pool.query(
-      'DELETE FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2 RETURNING *',
-      [usuarioId, cursoId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' });
-    }
-    
-    res.json({ message: 'Usuario desasignado del curso exitosamente' });
-  } catch (err) {
-    console.error('Error al desasignar usuario:', err);
-    res.status(500).json({ error: 'Error al desasignar usuario' });
-  }
-});
-
-// Obtener usuarios asignados a un curso
-app.get('/api/cursos/:id/usuarios', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  
-  try {
-    const result = await pool.query(`
-      SELECT u.id, u.rut, u.nombre, u.correo, u.rol 
-      FROM usuarios u 
-      INNER JOIN curso_usuarios cu ON u.id = cu.usuario_id 
-      WHERE cu.curso_id = $1
-      ORDER BY u.nombre
-    `, [id]);
-    
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error al obtener usuarios del curso:', err);
-    res.status(500).json({ error: 'Error al obtener usuarios del curso' });
-  }
-});
-
-// RUTA: eliminar usuario (solo administradores)
-app.delete('/api/usuarios/:id', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-
-  // Verificar que quien hace la petición es administrador
-  if(req.user.rol !== 0){
-    return res.status(403).json({ error: 'Solo los administradores pueden eliminar usuarios' });
-  }
-
-  try {
-    const result = await pool.query(
-      'DELETE FROM usuarios WHERE id = $1 RETURNING *',
-      [id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-    
-    res.json({ message: 'Usuario eliminado exitosamente', usuario: result.rows[0] });
-  } catch (err) {
-    console.error('Error al eliminar usuario:', err);
-    res.status(500).json({ error: 'Error al eliminar usuario' });
-  }
-});
-
-// Eliminar curso (solo administradores)
-app.delete('/api/cursos/:id', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-
-  // Verificar que quien hace la petición es administrador
-  if(req.user.rol !== 0){
-    return res.status(403).json({ error: 'Solo los administradores pueden eliminar cursos' });
-  }
-
-  try {
-    const result = await pool.query(
-      'DELETE FROM cursos WHERE id = $1 RETURNING *',
-      [id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Curso no encontrado' });
-    }
-    
-    res.json({ message: 'Curso eliminado exitosamente', curso: result.rows[0] });
-  } catch (err) {
-    console.error('Error al eliminar curso:', err);
-    res.status(500).json({ error: 'Error al eliminar curso' });
   }
 });
 
