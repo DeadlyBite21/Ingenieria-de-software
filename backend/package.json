@@ -1,0 +1,22 @@
+{
+  "name": "backend-api",
+  "version": "1.0.0",
+  "description": "API Backend para sistema de cursos",
+  "main": "api.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node api.js",
+    "dev": "nodemon api.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "pg": "^8.11.0",
+    "jsonwebtoken": "^9.0.0",
+    "bcrypt": "^5.1.0",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+}

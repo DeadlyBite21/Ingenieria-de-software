@@ -1,14 +1,24 @@
-import { Router } from "express";
-import jwt from "jsonwebtoken";
-import fetch from "node-fetch";
-import pkg from "pg";
-import bcrypt from "bcryptjs"; // para encriptar contraseñas
-import dotenv from "dotenv";
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const { Pool } = require('pg');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
 dotenv.config();
 const { Pool } = pkg;
 
-const router = Router();
+const app = express();
+
+// Configuración de CORS más específica
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.use(express.json());
 
 // Pool de conexión a Neon
 const pool = new Pool({
@@ -16,17 +26,30 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false } // Necesario en Neon
 });
 
-// ================== RUTAS ==================
+// Middleware de autenticación
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Token requerido' });
+  }
+  
+  jwt.verify(token, process.env.JWT_SECRET || 'secreto123', (err, user) => {
+    if (err) return res.status(403).json({ error: 'Token inválido' });
+    req.user = user;
+    next();
+  });
+};
 
-// Ruta de prueba
-router.get("/", (req, res) => {
-  res.send("API conectada a Neon 🚀");
+// RUTA DE PRUEBA
+app.get('/', (req, res) => {
+  res.send('API conectada a Neon 🚀');
 });
 
-// Login
-router.post("/login", async (req, res) => {
-  const { rut, contraseña } = req.body;
-  if (!rut || !contraseña) return res.status(400).json({ error: "Falta rut o contraseña" });
+// RUTA: Inicio de sesión
+app.post('/api/login', async (req, res) => {
+  const { rut, contrasena } = req.body;
 
   try {
     const result = await pool.query("SELECT * FROM usuarios WHERE rut = $1", [rut]);
@@ -35,7 +58,22 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Usuario no encontrado" });
 
     const usuario = result.rows[0];
-    const validPassword = await bcrypt.compare(contraseña, usuario.contraseña);
+
+    // Comparar contraseña - manejar tanto hasheadas como no hasheadas
+    let validPassword = false;
+    
+    if (usuario.contrasena.startsWith('$2b$')) {
+      // Si está hasheada con bcrypt
+      validPassword = await bcrypt.compare(contrasena, usuario.contrasena);
+    } else {
+      // Si no está hasheada (texto plano)
+      validPassword = usuario.contrasena === contrasena;
+      console.log(`🔍 Login attempt - RUT: ${rut}, Password match: ${validPassword}`);
+    }
+
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
 
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
 
@@ -62,8 +100,27 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Obtener todos los usuarios
-router.get("/usuarios", async (req, res) => {
+// RUTA: Obtener perfil del usuario autenticado
+app.get('/api/me', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, rut, nombre, correo, rol FROM usuarios WHERE id = $1',
+      [req.user.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error al obtener perfil:', err);
+    res.status(500).json({ error: 'Error al obtener perfil' });
+  }
+});
+
+// RUTA: obtener todos los usuarios
+app.get('/api/usuarios', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM usuarios ORDER BY id");
     res.json(result.rows);
@@ -73,36 +130,22 @@ router.get("/usuarios", async (req, res) => {
   }
 });
 
-// Crear usuario
-router.post("/usuarios/crear", async (req, res) => {
-  const { rol, rut, nombre, correo, contraseña } = req.body;
+// RUTA: crear usuario (solo administradores)
+app.post('/api/usuarios/crear', authenticateToken, async (req, res) => {
+  const { rol, rut, nombre, correo, contrasena } = req.body;
 
-  if (rol !== 0) return res.status(400).json({ error: "El usuario no es administrador" });
-
-  try {
-    const hashedPassword = await bcrypt.hash(contraseña, 10);
-    const result = await pool.query(
-      "INSERT INTO usuarios (rol, rut, nombre, correo, contraseña) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [rol, rut, nombre, correo, hashedPassword]
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error("Error en crear usuario:", err);
-    res.status(500).json({ error: "Error al insertar usuario" });
+  // Verificar que quien hace la petición es administrador
+  if(req.user.rol !== 0){
+    return res.status(403).json({ error: 'Solo los administradores pueden crear usuarios' });
   }
-});
-
-// Cambiar contraseña
-router.post("/usuarios/cambiar-contraseña", async (req, res) => {
-  const { id, nuevaContraseña } = req.body;
-  if (!id || !nuevaContraseña) return res.status(400).json({ error: "Faltan datos" });
-
+  
   try {
-    const hashedPassword = await bcrypt.hash(nuevaContraseña, 10);
+    // Encriptar contraseña
+    const hashedPassword = await bcrypt.hash(contrasena, 10);
+    
     const result = await pool.query(
-      "UPDATE usuarios SET contraseña = $1 WHERE id = $2 RETURNING *",
-      [hashedPassword, id]
+      'INSERT INTO usuarios (rol, rut, nombre, correo, contrasena) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [rol, rut, nombre, correo, hashedPassword]
     );
 
     if (result.rows.length === 0)
@@ -113,17 +156,46 @@ router.post("/usuarios/cambiar-contraseña", async (req, res) => {
       usuario: result.rows[0],
     });
   } catch (err) {
-    console.error("Error al cambiar contraseña:", err);
-    res.status(500).json({ error: "Error en el servidor" });
+    console.error('Error al crear usuario:', err);
+    res.status(500).json({ error: 'Error al crear usuario' });
   }
 });
 
-// ================== CURSOS ==================
+// RUTA: eliminar usuario (solo administradores)
+app.delete('/api/usuarios/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
 
-// Crear curso
-router.post("/cursos/crear", async (req, res) => {
+  // Verificar que quien hace la petición es administrador
+  if(req.user.rol !== 0){
+    return res.status(403).json({ error: 'Solo los administradores pueden eliminar usuarios' });
+  }
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM usuarios WHERE id = $1 RETURNING *',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    res.json({ message: 'Usuario eliminado exitosamente', usuario: result.rows[0] });
+  } catch (err) {
+    console.error('Error al eliminar usuario:', err);
+    res.status(500).json({ error: 'Error al eliminar usuario' });
+  }
+});
+
+// Crear curso (solo administradores)
+app.post('/api/cursos/crear', authenticateToken, async (req, res) => {
   const { nombre } = req.body;
   if (!nombre) return res.status(400).json({ error: "Falta el nombre del curso" });
+
+  // Verificar que quien hace la petición es administrador
+  if(req.user.rol !== 0){
+    return res.status(403).json({ error: 'Solo los administradores pueden crear cursos' });
+  }
 
   try {
     const result = await pool.query(
@@ -138,8 +210,8 @@ router.post("/cursos/crear", async (req, res) => {
   }
 });
 
-// Obtener cursos
-router.get("/cursos", async (req, res) => {
+// Obtener todos los cursos (usuarios autenticados)
+app.get('/api/cursos', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM cursos ORDER BY id");
     res.json(result.rows);
@@ -149,16 +221,35 @@ router.get("/cursos", async (req, res) => {
   }
 });
 
-// Asignar usuario a curso
-router.post("/cursos/:cursoId/usuarios/:usuarioId", async (req, res) => {
+// Asignar usuario a un curso (solo administradores)
+app.post('/api/cursos/:cursoId/usuarios/:usuarioId', authenticateToken, async (req, res) => {
   const { cursoId, usuarioId } = req.params;
 
-  try {
-    const userCheck = await pool.query("SELECT * FROM usuarios WHERE id = $1", [usuarioId]);
-    if (userCheck.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+  // Verificar que quien hace la petición es administrador
+  if(req.user.rol !== 0){
+    return res.status(403).json({ error: 'Solo los administradores pueden asignar usuarios a cursos' });
+  }
 
-    const usuario = userCheck.rows[0];
-    if (usuario.rol !== 2) return res.status(400).json({ error: "Solo rol=2 puede asignarse a cursos" });
+  try {
+    // Verificar que el usuario existe
+    const userCheck = await pool.query(
+      'SELECT * FROM usuarios WHERE id = $1',
+      [usuarioId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Verificar que el curso existe
+    const courseCheck = await pool.query(
+      'SELECT * FROM cursos WHERE id = $1',
+      [cursoId]
+    );
+
+    if (courseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Curso no encontrado' });
+    }
 
     const result = await pool.query(
       "INSERT INTO curso_usuarios (usuario_id, curso_id) VALUES ($1, $2) RETURNING *",
@@ -202,4 +293,57 @@ router.post("/recover-password", async (req, res) => {
   }
 });
 
-export default router;
+// Desasignar usuario de un curso (solo administradores)
+app.delete('/api/cursos/:cursoId/usuarios/:usuarioId', authenticateToken, async (req, res) => {
+  const { cursoId, usuarioId } = req.params;
+
+  // Verificar que quien hace la petición es administrador
+  if(req.user.rol !== 0){
+    return res.status(403).json({ error: 'Solo los administradores pueden desasignar usuarios de cursos' });
+  }
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2 RETURNING *',
+      [usuarioId, cursoId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Asignación no encontrada' });
+    }
+    
+    res.json({ message: 'Usuario desasignado del curso exitosamente' });
+  } catch (err) {
+    console.error('Error al desasignar usuario:', err);
+    res.status(500).json({ error: 'Error al desasignar usuario' });
+  }
+});
+
+// Obtener usuarios asignados a un curso
+app.get('/api/cursos/:id/usuarios', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const result = await pool.query(`
+      SELECT u.id, u.rut, u.nombre, u.correo, u.rol 
+      FROM usuarios u 
+      INNER JOIN curso_usuarios cu ON u.id = cu.usuario_id 
+      WHERE cu.curso_id = $1
+      ORDER BY u.nombre
+    `, [id]);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error al obtener usuarios del curso:', err);
+    res.status(500).json({ error: 'Error al obtener usuarios del curso' });
+  }
+});
+
+// Iniciar servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+  console.log(`📱 Frontend esperado en: http://localhost:5173`);
+  console.log(`🌐 API disponible en: http://localhost:${PORT}`);
+  console.log(`🔍 Prueba la API: http://localhost:${PORT}/api/usuarios`);
+});
