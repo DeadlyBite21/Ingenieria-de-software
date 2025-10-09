@@ -5,6 +5,8 @@ const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
+dotenv.config();
+const { Pool } = pkg;
 
 const app = express();
 
@@ -21,7 +23,7 @@ app.use(express.json());
 // Pool de conexión a Neon
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }  // Necesario en Neon
+  ssl: { rejectUnauthorized: false } // Necesario en Neon
 });
 
 // Middleware de autenticación
@@ -50,15 +52,10 @@ app.post('/api/login', async (req, res) => {
   const { rut, contrasena } = req.body;
 
   try {
-    // Buscar usuario por RUT
-    const result = await pool.query(
-      'SELECT * FROM usuarios WHERE rut = $1',
-      [rut]
-    );
+    const result = await pool.query("SELECT * FROM usuarios WHERE rut = $1", [rut]);
 
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Usuario no encontrado' });
-    }
+    if (result.rows.length === 0)
+      return res.status(401).json({ error: "Usuario no encontrado" });
 
     const usuario = result.rows[0];
 
@@ -78,28 +75,28 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
 
-    // (Opcional) generar token JWT
+    if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
+
     const token = jwt.sign(
       { id: usuario.id, rut: usuario.rut, rol: usuario.rol },
-      process.env.JWT_SECRET || 'secreto123',
-      { expiresIn: '1h' }
+      process.env.JWT_SECRET || "secreto123",
+      { expiresIn: "1h" }
     );
 
     res.json({
-      message: 'Inicio de sesión exitoso 🚀',
+      message: "Inicio de sesión exitoso 🚀",
       usuario: {
         id: usuario.id,
         rut: usuario.rut,
         nombre: usuario.nombre,
         correo: usuario.correo,
-        rol: usuario.rol
+        rol: usuario.rol,
       },
-      token
+      token,
     });
-
   } catch (err) {
-    console.error('Error en login:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
+    console.error("Error en login:", err);
+    res.status(500).json({ error: "Error en el servidor" });
   }
 });
 
@@ -125,11 +122,11 @@ app.get('/api/me', authenticateToken, async (req, res) => {
 // RUTA: obtener todos los usuarios
 app.get('/api/usuarios', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM usuarios');
+    const result = await pool.query("SELECT * FROM usuarios ORDER BY id");
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error en la consulta' });
+    res.status(500).json({ error: "Error en la consulta" });
   }
 });
 
@@ -150,7 +147,14 @@ app.post('/api/usuarios/crear', authenticateToken, async (req, res) => {
       'INSERT INTO usuarios (rol, rut, nombre, correo, contrasena) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [rol, rut, nombre, correo, hashedPassword]
     );
-    res.json(result.rows[0]);
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: "Usuario no encontrado" });
+
+    res.json({
+      message: "Contraseña actualizada con éxito 🚀",
+      usuario: result.rows[0],
+    });
   } catch (err) {
     console.error('Error al crear usuario:', err);
     res.status(500).json({ error: 'Error al crear usuario' });
@@ -186,6 +190,7 @@ app.delete('/api/usuarios/:id', authenticateToken, async (req, res) => {
 // Crear curso (solo administradores)
 app.post('/api/cursos/crear', authenticateToken, async (req, res) => {
   const { nombre } = req.body;
+  if (!nombre) return res.status(400).json({ error: "Falta el nombre del curso" });
 
   // Verificar que quien hace la petición es administrador
   if(req.user.rol !== 0){
@@ -194,30 +199,25 @@ app.post('/api/cursos/crear', authenticateToken, async (req, res) => {
 
   try {
     const result = await pool.query(
-      'INSERT INTO cursos (nombre) VALUES ($1) RETURNING *',
+      "INSERT INTO cursos (nombre) VALUES ($1) RETURNING *",
       [nombre]
     );
-
-    res.status(201).json({
-      message: 'Curso creado con éxito 🚀',
-      curso: result.rows[0]
-    });
+    res.status(201).json({ message: "Curso creado con éxito 🚀", curso: result.rows[0] });
   } catch (err) {
-    if (err.code === '23505') { // UNIQUE violation en PostgreSQL
-      return res.status(400).json({ error: 'El curso ya existe' });
-    }
-    console.error('Error al crear curso:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
+    if (err.code === "23505") return res.status(400).json({ error: "El curso ya existe" });
+    console.error(err);
+    res.status(500).json({ error: "Error en el servidor" });
   }
 });
 
 // Obtener todos los cursos (usuarios autenticados)
 app.get('/api/cursos', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM cursos ORDER BY id');
+    const result = await pool.query("SELECT * FROM cursos ORDER BY id");
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: 'Error al obtener cursos' });
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener cursos" });
   }
 });
 
@@ -251,23 +251,45 @@ app.post('/api/cursos/:cursoId/usuarios/:usuarioId', authenticateToken, async (r
       return res.status(404).json({ error: 'Curso no encontrado' });
     }
 
-    // Insertar en curso_usuarios
     const result = await pool.query(
-      'INSERT INTO curso_usuarios (usuario_id, curso_id) VALUES ($1, $2) RETURNING *',
+      "INSERT INTO curso_usuarios (usuario_id, curso_id) VALUES ($1, $2) RETURNING *",
       [usuarioId, cursoId]
     );
 
-    res.json({
-      message: 'Usuario asignado al curso con éxito 🚀',
-      asignacion: result.rows[0]
+    res.json({ message: "Usuario asignado al curso con éxito 🚀", asignacion: result.rows[0] });
+  } catch (err) {
+    if (err.code === "23505") return res.status(400).json({ error: "El usuario ya está en este curso" });
+    console.error(err);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// ================== RECUPERACIÓN DE CONTRASEÑA ==================
+
+router.post("/recover-password", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) return res.status(400).json({ error: "Falta el email" });
+
+  // Aquí deberías verificar que el email exista en tu DB
+  const userExists = true;
+
+  if (!userExists) return res.status(404).json({ error: "Usuario no encontrado" });
+
+  const token = jwt.sign({ email }, process.env.JWT_SECRET || "secreto123", { expiresIn: "15m" });
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+  try {
+    await fetch(process.env.N8N_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, resetUrl }),
     });
 
+    res.json({ message: "Correo de recuperación enviado correctamente" });
   } catch (err) {
-    if (err.code === '23505') {
-      return res.status(400).json({ error: 'El usuario ya está en este curso' });
-    }
-    console.error('Error en asignación:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
+    console.error("Error al enviar correo con n8n:", err);
+    res.status(500).json({ error: "No se pudo enviar el correo" });
   }
 });
 
