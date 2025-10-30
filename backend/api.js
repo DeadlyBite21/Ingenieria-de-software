@@ -5,9 +5,6 @@ const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
-dotenv.config();
-const { Pool } = pkg;
-
 const app = express();
 
 // Configuración de CORS más específica
@@ -266,7 +263,7 @@ app.post('/api/cursos/:cursoId/usuarios/:usuarioId', authenticateToken, async (r
 
 // ================== RECUPERACIÓN DE CONTRASEÑA ==================
 
-router.post("/recover-password", async (req, res) => {
+app.post("/recover-password", async (req, res) => {
   const { email } = req.body;
 
   if (!email) return res.status(400).json({ error: "Falta el email" });
@@ -320,7 +317,7 @@ app.delete('/api/cursos/:cursoId/usuarios/:usuarioId', authenticateToken, async 
 });
 
 // Obtener usuarios asignados a un curso
-app.get('/api/cursos/:id/usuarios', authenticateToken, async (req, res) => {
+app.get('/api/cursos/:id/alumnos', authenticateToken, async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -334,8 +331,8 @@ app.get('/api/cursos/:id/usuarios', authenticateToken, async (req, res) => {
     
     res.json(result.rows);
   } catch (err) {
-    console.error('Error al obtener usuarios del curso:', err);
-    res.status(500).json({ error: 'Error al obtener usuarios del curso' });
+    console.error('Error al obtener alumnos del curso:', err);
+    res.status(500).json({ error: 'Error al obtener alumnos del curso' });
   }
 });
 
