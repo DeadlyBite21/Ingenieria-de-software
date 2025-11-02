@@ -4,10 +4,12 @@ import viteLogo from "/vite.svg";
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginForm from './components/LoginForm';
+// import LoginForm from './components/LoginForm'; // <-- Ya no importamos esto aquí
+import Login from './pages/Login'; // <--- IMPORTAMOS LA PÁGINA DE LOGIN
 import DashboardRouter from './components/DashboardRouter';
 import ProtectedRoute from './components/ProtectedRoute';
 
+// El componente Home (demo de Vite) sigue igual
 function Home() {
   const { user } = useAuth();
   const [count, setCount] = useState(0);
@@ -15,76 +17,19 @@ function Home() {
   return (
     <>
       <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        {/* ... (Tu código de Home existente) ... */}
       </div>
       <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-      
-      {/* Mostrar diferentes enlaces según el estado de autenticación */}
-      <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-        {user ? (
-          <>
-            <Link 
-              to="/dashboard" 
-              style={{ 
-                padding: '8px 16px', 
-                backgroundColor: '#007bff', 
-                color: 'white', 
-                textDecoration: 'none', 
-                borderRadius: '4px' 
-              }}
-            >
-              Ir al Dashboard
-            </Link>
-            <button 
-              onClick={() => {
-                localStorage.removeItem('token');
-                window.location.reload();
-              }}
-              style={{ 
-                padding: '8px 16px', 
-                backgroundColor: '#dc3545', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Cerrar Sesión
-            </button>
-          </>
-        ) : (
-          <Link 
-            to="/login" 
-            style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#28a745', 
-              color: 'white', 
-              textDecoration: 'none', 
-              borderRadius: '4px' 
-            }}
-          >
-            Iniciar Sesión
-          </Link>
-        )}
-      </div>
+      {/* ... (Tu código de Home existente) ... */}
     </>
   );
+}
+
+// NUEVO: Componente para rutas públicas
+// Si el usuario ya está logueado, lo redirige al dashboard
+function PublicRoute({ children }) {
+    const { user } = useAuth();
+    return user ? <Navigate to="/dashboard" /> : children;
 }
 
 function App() {
@@ -92,8 +37,28 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<LoginForm />} />
+          {/* RUTA PRINCIPAL: 
+            Redirige automáticamente a /login 
+          */}
+          <Route path="/" element={<Navigate to="/login" />} />
+          
+          {/* RUTA DE LOGIN: 
+            Usa la nueva página de Login y la protege con PublicRoute 
+          */}
+          <Route 
+            path="/login" 
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            } 
+          />
+          
+          {/* Dejamos la demo de Home en otra ruta por si la necesitas */}
+          <Route path="/home-demo" element={<Home />} />
+          
+          {/* RUTAS PROTEGIDAS (sin cambios) 
+          */}
           <Route 
             path="/dashboard" 
             element={

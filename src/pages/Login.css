@@ -1,0 +1,120 @@
+/* src/pages/Login.css */
+
+/*
+  Aplica el nuevo fondo de imagen a la página de login.
+*/
+body.login-active {
+  /* ¡Aquí usamos la nueva imagen de fondo! */
+  background-image: url('../assets/login-background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  
+  /* Color de fondo si la imagen no carga */
+  background-color: #2b2b5f; 
+}
+
+/* Centra el contenedor del formulario en la página */
+.login-container-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+/* Estilos para la nueva tarjeta de login (blanca y centrada)
+  basada en tu captura 'image_5dbae5.png'
+*/
+.login-card-simple {
+  max-width: 450px; /* Hacemos la tarjeta más angosta */
+  width: 100%;
+  border: none;
+  border-radius: 1.25rem; /* Bordes redondeados */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); /* Sombra más notoria */
+}
+
+/* Icono de casa morado */
+.login-icon {
+  font-size: 2.5rem;
+  color: #6a5acd; /* Tono morado de tu captura */
+  margin-bottom: 0.5rem;
+}
+
+/* Título "Welcome home" */
+.login-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #333;
+}
+
+/* Subtítulo "Please enter your details." */
+.login-subtitle {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+/* Estilo para los labels (RUT, Contraseña) */
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+}
+
+/* Estilo para los inputs */
+.input-group .form-control,
+.input-group .input-group-text {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    font-size: 1rem;
+}
+
+.input-group .form-control:focus {
+    border-color: #6a5acd;
+    box-shadow: 0 0 0 0.25rem rgba(106, 90, 205, 0.25);
+}
+
+.input-group .input-group-text {
+    background-color: #f8f9fa;
+}
+
+
+/* Botón morado personalizado */
+.btn-custom-purple {
+  background-color: #6a5acd;
+  border-color: #6a5acd;
+  color: white;
+  padding: 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+}
+
+.btn-custom-purple:hover {
+  background-color: #5a4ac0;
+  border-color: #5a4ac0;
+  color: white;
+}
+
+.btn-custom-purple:disabled {
+  background-color: #a097d6;
+  border-color: #a097d6;
+}
+
+/* Enlace "Forgot password?" */
+.custom-link-purple {
+  color: #6a5acd;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.custom-link-purple:hover {
+  text-decoration: underline;
+}
+
+/* Checkbox label */
+.form-check-label {
+  font-size: 0.9rem;
+  color: #555;
+}
