@@ -185,8 +185,7 @@ router.post("/cursos/:cursoId/usuarios/:usuarioId", async (req, res) => {
 router.post("/recover-password", async (req, res) => {
   const { email } = req.body;
 
-  const userExists = true; // validar con DB
-
+  const userExists = await User.findOne({ email });
   if (!userExists) {
     return res.status(404).json({ error: "Usuario no encontrado" });
   }
