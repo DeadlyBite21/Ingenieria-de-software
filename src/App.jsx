@@ -9,6 +9,11 @@ import Login from './pages/Login'; // <--- IMPORTAMOS LA PÁGINA DE LOGIN
 import DashboardRouter from './components/DashboardRouter';
 import ProtectedRoute from './components/ProtectedRoute';
 
+import DashboardLayout from "./components/DashboardLayout"; // Necesario para las rutas
+import IncidentsPage from "./pages/IncidentsPage";
+import IncidentCreatePage from "./pages/IncidentCreatePage";
+import IncidentDetailPage from "./pages/IncidentDetailPage";
+
 // El componente Home (demo de Vite) sigue igual
 function Home() {
   const { user } = useAuth();
@@ -88,6 +93,52 @@ function App() {
                     ← Volver al Dashboard
                   </button>
                 </div>
+              </ProtectedRoute>
+            } 
+          />
+<Route 
+            path="/dashboard/incidentes" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <IncidentsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Crear Incidente */}
+          <Route 
+            path="/dashboard/incidentes/crear" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <IncidentCreatePage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Editar Incidente */}
+          <Route 
+            path="/dashboard/incidentes/editar/:id" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <IncidentCreatePage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Detalle de Incidente */}
+          <Route 
+            path="/dashboard/incidentes/:id" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <IncidentDetailPage />
+                </DashboardLayout>
               </ProtectedRoute>
             } 
           />

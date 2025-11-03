@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Button from 'react-bootstrap/Button';
-import { BoxArrowRight } from 'react-bootstrap-icons';
+import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill } from 'react-bootstrap-icons';
 import './DashboardLayout.css'; // Importamos los nuevos estilos
 
 // Este componente "envolverá" a tus dashboards (Admin y User)
@@ -48,8 +48,18 @@ export default function DashboardLayout({ children }) {
 
         {/* 2. Menú (Aquí pondrás más botones en el futuro) */}
         <div className="sidebar-menu">
-          {/* Ejemplo de botón futuro: */}
-          {/* <Button variant="link" className="text-start text-white text-decoration-none">Inicio</Button> */}
+          <Link 
+            to="/dashboard" 
+            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center mb-1"
+          >
+            <HouseDoorFill className="me-2" /> Inicio
+          </Link>
+          <Link 
+            to="/dashboard/incidentes" 
+            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
+          >
+            <ExclamationOctagonFill className="me-2" /> Incidentes
+          </Link>
         </div>
 
         {/* 3. Botón de Cerrar Sesión (al final) */}
