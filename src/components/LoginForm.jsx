@@ -101,7 +101,7 @@ function LoginForm() {
               disabled={loading}
               className="form-check-label"
             />
-            <link to="/recover-password" className="custom-link-purple">Forgot password?</link>
+            <a href="/recover-password" className="custom-link-purple">Forgot password?</a>
           </div>
 
           {/* Botón Login */}
