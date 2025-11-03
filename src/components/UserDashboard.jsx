@@ -46,7 +46,8 @@ export default function UserDashboard() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
+    // ¡HEMOS QUITADO EL STYLE DE ESTE DIV!
+    <div>
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h1>Mi Dashboard</h1>

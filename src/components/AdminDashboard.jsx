@@ -162,7 +162,8 @@ export default function AdminDashboard() {
   if (error) return <div style={{ padding: 16, color: 'red' }}>Error: {error}</div>;
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+    // ¡HEMOS QUITADO EL STYLE DE ESTE DIV!
+    <div>
       <h1>Panel de Administrador</h1>
       <p style={{ marginBottom: '2rem', color: '#666' }}>
         Bienvenido <strong>{user?.nombre}</strong> - Gestiona usuarios y cursos del sistema

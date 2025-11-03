@@ -28,11 +28,15 @@ function LoginForm() {
     setError(null);
     setLoading(true);
     try {
-      // Usamos la función de login del contexto
       await login(rut, contrasena);
-      navigate("/dashboard"); // Redirigir al dashboard
+      navigate("/dashboard");
     } catch (err) {
-      setError(err.message || "Error al iniciar sesión.");
+      
+      // --- ¡ESTE ES EL CAMBIO! ---
+      // En lugar de mostrar el error del servidor (err.message),
+      // mostramos el mensaje genérico que solicitaste.
+      setError("RUT o Contraseña incorrecta, por favor inténtalo de nuevo");
+      
     } finally {
       setLoading(false);
     }
@@ -47,8 +51,8 @@ function LoginForm() {
         {/* Icono y Título */}
         <div className="text-start mb-4">
           <HouseDoorFill className="login-icon" />
-          <h1 className="login-title">Welcome home</h1>
-          <p className="login-subtitle">Please enter your details.</p>
+          <h1 className="login-title">Bienvenido/a</h1>
+          <p className="login-subtitle">Por favor ingresa tus datos.</p>
         </div>
 
         {/* Formulario */}
@@ -102,7 +106,7 @@ function LoginForm() {
 
           {/* Botón Login */}
           <div className="d-grid">
-            <Button variant="primary" type="submit" className="btn-custom-purple" disabled={loading}>
+            <Button variant="light" type="submit" className="btn-custom-light" disabled={loading}>
               {loading ? (
                 <>
                   <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
@@ -114,7 +118,7 @@ function LoginForm() {
             </Button>
           </div>
 
-          {/* Mensaje de Error */}
+          {/* Mensaje de Error (ahora mostrará tu nuevo mensaje) */}
           {error && <Alert variant="danger" className="mt-4 text-center">{error}</Alert>}
 
         </Form>
