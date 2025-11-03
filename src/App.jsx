@@ -4,8 +4,7 @@ import viteLogo from "/vite.svg";
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './context/AuthContext';
-// import LoginForm from './components/LoginForm'; // <-- Ya no importamos esto aquí
-import Login from './pages/Login'; // <--- IMPORTAMOS LA PÁGINA DE LOGIN
+import Login from './pages/Login'; // Importamos la página de Login
 import DashboardRouter from './components/DashboardRouter';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -13,6 +12,10 @@ import DashboardLayout from "./components/DashboardLayout"; // Necesario para la
 import IncidentsPage from "./pages/IncidentsPage";
 import IncidentCreatePage from "./pages/IncidentCreatePage";
 import IncidentDetailPage from "./pages/IncidentDetailPage";
+// --- IMPORTACIONES DE RECUPERACIÓN AÑADIDAS ---
+import RecoverPassword from './pages/RecoverPassword';
+import ResetPassword from './pages/ResetPassword';
+// --- FIN DE IMPORTACIONES AÑADIDAS ---
 
 // El componente Home (demo de Vite) sigue igual
 function Home() {
@@ -30,7 +33,7 @@ function Home() {
   );
 }
 
-// NUEVO: Componente para rutas públicas
+// Componente para rutas públicas
 // Si el usuario ya está logueado, lo redirige al dashboard
 function PublicRoute({ children }) {
     const { user } = useAuth();
@@ -59,10 +62,29 @@ function App() {
             } 
           />
           
+          {/* --- RUTAS DE RECUPERACIÓN AÑADIDAS --- */}
+          <Route 
+            path="/recover-password" 
+            element={
+              <PublicRoute>
+                <RecoverPassword />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/reset-password" 
+            element={
+              <PublicRoute>
+                <ResetPassword />
+              </PublicRoute>
+            } 
+          />
+          {/* --- FIN DE RUTAS AÑADIDAS --- */}
+          
           {/* Dejamos la demo de Home en otra ruta por si la necesitas */}
           <Route path="/home-demo" element={<Home />} />
           
-          {/* RUTAS PROTEGIDAS (sin cambios) 
+          {/* RUTAS PROTEGIDAS 
           */}
           <Route 
             path="/dashboard" 
