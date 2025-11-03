@@ -18,6 +18,28 @@ const pool = new Pool({
 
 // ================== RUTAS ==================
 
+// Middleware para autenticar token
+const authenticateToken = (req, res, next) => {
+  // Obtiene el token del header 'Authorization'. Formato: "Bearer TOKEN"
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) {
+    return res.status(401).json({ error: "Token no proporcionado" });
+  }
+
+  // Verifica el token
+  jwt.verify(token, process.env.JWT_SECRET || "secreto123", (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: "Token inválido o expirado" });
+    }
+    
+    // Si es válido, guarda el payload del token (id, rut, rol) en req.user
+    req.user = user; 
+    next(); // Continúa con la siguiente función (la ruta)
+  });
+};
+
 // Ruta de prueba
 router.get("/", (req, res) => {
   res.send("API conectada a Neon 🚀");
@@ -184,10 +206,213 @@ router.post("/cursos/:cursoId/usuarios/:usuarioId", async (req, res) => {
   }
 });
 
+// ===================== INCIDENTES (INTEGRADO AQUÍ) =====================
 
-// ================== RECUPERACIÓN DE CONTRASEÑA (MODIFICADO) ==================
+export const createIncident = (incidentData) => {
+  return apiFetch('/api/incidentes', {
+    method: 'POST',
+    body: JSON.stringify(incidentData),
+  });
+};
 
-// PASO 1: Solicitar el enlace de recuperación
+// Validación de payload de incidente
+function assertIncidentePayload(body) {
+  const errors = [];
+  const required = ["idCurso", "tipo", "severidad", "descripcion"];
+  for (const k of required) if (!body[k]) errors.push(`Falta ${k}`);
+  if ((body.descripcion || "").length < 10) errors.push("La descripción debe tener al menos 10 caracteres");
+  if (errors.length) { const e = new Error("Payload inválido"); e.code = 400; e.details = errors; throw e; }
+}
+
+// Crear incidente
+router.post('/incidentes', authenticateToken, async (req, res) => {
+  try {
+    assertIncidentePayload(req.body);
+    const {
+      alumnos = [],                // [id_usuario, ...]
+      idCurso,                     // número (columna real: id_curso)
+      tipo,
+      severidad,
+      descripcion,
+      lugar = null,
+      fecha = new Date().toISOString(),
+      participantes = [],          // [{nombre, rol}]
+      medidas = [],                // [{texto, ...}]
+      adjuntos = [],               // [{url, label}]
+      estado = "abierto"
+    } = req.body;
+
+    // Si es docente (rol=3) debe pertenecer al curso
+    if (req.user?.rol === 1) {
+      const check = await pool.query(
+        `SELECT 1 FROM curso_usuarios WHERE id_usuario = $1 AND id_curso = $2`,
+        [req.user.id, idCurso]
+      );
+      if (check.rowCount === 0) {
+        return res.status(403).json({ error: "No puedes registrar incidentes en un curso que no te corresponde." });
+      }
+    }
+
+    const ins = await pool.query(
+      `INSERT INTO incidentes
+        (alumnos, id_curso, tipo, severidad, descripcion, lugar, fecha, participantes, medidas, adjuntos, estado, creado_por, creado_en, actualizado_en)
+       VALUES
+        ($1,      $2,       $3,   $4,        $5,          $6,    $7,    $8,            $9,      $10,      $11,    $12,        NOW(),      NOW())
+       RETURNING *`,
+      [
+        JSON.stringify(alumnos),
+        idCurso,
+        tipo,
+        severidad,
+        descripcion,
+        lugar,
+        fecha,
+        JSON.stringify(participantes),
+        JSON.stringify(medidas),
+        JSON.stringify(adjuntos),
+        estado,
+        req.user?.id || null
+      ]
+    );
+
+    res.status(201).json({ message: "Incidente creado", data: ins.rows[0] });
+  } catch (e) {
+    res.status(e.code || 500).json({ error: e.message, details: e.details });
+  }
+});
+
+// Listar incidentes (filtros + paginación)
+router.get('/incidentes', authenticateToken, async (req, res) => {
+  try {
+    const { idCurso, idAlumno, estado, from, to, page = 1, limit = 10 } = req.query;
+
+    const where = [];
+    const values = [];
+    let i = 1;
+
+    if (idCurso)  { where.push(`id_curso = $${i++}`); values.push(+idCurso); }
+    if (estado)   { where.push(`estado = $${i++}`);   values.push(estado); }
+    if (idAlumno) { where.push(`alumnos @> $${i++}::jsonb`); values.push(JSON.stringify([+idAlumno])); }
+    if (from)     { where.push(`fecha >= $${i++}`);   values.push(new Date(from)); }
+    if (to)       { where.push(`fecha <= $${i++}`);   values.push(new Date(to)); }
+
+    // Docente: limitar a cursos donde participa
+    if (req.user?.rol === 1) {
+      where.push(`id_curso IN (SELECT id_curso FROM curso_usuarios WHERE id_usuario = $${i++})`);
+      values.push(req.user.id);
+    }
+
+    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const offset = (Number(page) - 1) * Number(limit);
+
+    const q = `
+      SELECT * FROM incidentes
+      ${whereSQL}
+      ORDER BY fecha DESC
+      LIMIT ${Number(limit)} OFFSET ${offset}
+    `;
+    const qCount = `SELECT COUNT(*)::int AS total FROM incidentes ${whereSQL}`;
+
+    const [rows, count] = await Promise.all([
+      pool.query(q, values),
+      pool.query(qCount, values),
+    ]);
+
+    res.json({ data: rows.rows, total: count.rows[0].total, page: Number(page), limit: Number(limit) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Detalle por ID
+router.get('/incidentes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const r = await pool.query(`SELECT * FROM incidentes WHERE id = $1`, [id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: "No encontrado" });
+
+    // Docente: verificar que pertenece al curso
+    if (req.user?.rol === 3) {
+      const check = await pool.query(
+        `SELECT 1 FROM curso_usuarios WHERE id_usuario = $1 AND id_curso = $2`,
+        [req.user.id, r.rows[0].id_curso]
+      );
+      if (check.rowCount === 0) return res.status(403).json({ error: "Sin permisos" });
+    }
+
+    res.json(r.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Actualizar incidente (parcial)
+router.patch('/incidentes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Mapa payload → columnas
+    const map = {
+      idCurso: "id_curso",
+      tipo: "tipo",
+      severidad: "severidad",
+      descripcion: "descripcion",
+      lugar: "lugar",
+      fecha: "fecha",
+      estado: "estado",
+      alumnos: "alumnos",                 // jsonb
+      participantes: "participantes",     // jsonb
+      medidas: "medidas",                 // jsonb
+      adjuntos: "adjuntos"                // jsonb
+    };
+
+    const sets = [];
+    const values = [];
+    let i = 1;
+
+    for (const [k, col] of Object.entries(map)) {
+      if (k in req.body) {
+        if (["alumnos","participantes","medidas","adjuntos"].includes(k)) {
+          sets.push(`${col} = $${i++}::jsonb`);
+          values.push(JSON.stringify(req.body[k]));
+        } else {
+          sets.push(`${col} = $${i++}`);
+          values.push(req.body[k]);
+        }
+      }
+    }
+    if (sets.length === 0) return res.status(400).json({ error: "Nada para actualizar" });
+
+    // Docente: alcance por curso
+    if (req.user?.rol === 1) {
+      const check = await pool.query(`SELECT id_curso FROM incidentes WHERE id = $1`, [id]);
+      if (check.rowCount === 0) return res.status(404).json({ error: "No encontrado" });
+      const belongs = await pool.query(
+        `SELECT 1 FROM curso_usuarios WHERE id_usuario = $1 AND id_curso = $2`,
+        [req.user.id, check.rows[0].id_curso]
+      );
+      if (belongs.rowCount === 0) return res.status(403).json({ error: "Sin permisos" });
+    }
+
+    const sql = `
+      UPDATE incidentes
+         SET ${sets.join(", ")}, actualizado_en = NOW()
+       WHERE id = $${i}
+       RETURNING *
+    `;
+    values.push(id);
+
+    const upd = await pool.query(sql, values);
+    if (upd.rowCount === 0) return res.status(404).json({ error: "No encontrado" });
+
+    res.json({ message: "Incidente actualizado", data: upd.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ================== RECUPERACIÓN DE CONTRASEÑA ==================
+
 router.post("/recover-password", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Falta el correo" });
