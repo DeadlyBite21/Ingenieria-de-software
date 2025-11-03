@@ -3,18 +3,19 @@
   "version": "1.0.0",
   "description": "API Backend para sistema de cursos",
   "main": "api.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "start": "node api.js",
     "dev": "nodemon api.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "pg": "^8.11.0",
-    "jsonwebtoken": "^9.0.0",
     "bcrypt": "^5.1.0",
-    "dotenv": "^16.0.3"
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "pg": "^8.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.0"

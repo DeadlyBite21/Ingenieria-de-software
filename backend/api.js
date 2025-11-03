@@ -25,8 +25,8 @@ router.get("/", (req, res) => {
 
 // Login
 router.post("/login", async (req, res) => {
-  const { rut, contraseña } = req.body;
-  if (!rut || !contraseña) return res.status(400).json({ error: "Falta rut o contraseña" });
+  const { rut, contrasena } = req.body;
+  if (!rut || !contrasena) return res.status(400).json({ error: "Falta rut o contraseña" });
 
   try {
     const result = await pool.query("SELECT * FROM usuarios WHERE rut = $1", [rut]);
@@ -35,7 +35,14 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Usuario no encontrado" });
 
     const usuario = result.rows[0];
-    const validPassword = await bcrypt.compare(contraseña, usuario.contraseña);
+    let validPassword = false;
+if (usuario.contrasena?.startsWith?.('$2b$')) {
+  // Si la contraseña SÍ es un hash, usa bcrypt
+  validPassword = await bcrypt.compare(contrasena, usuario.contrasena);
+} else {
+  // Si es texto plano (tu caso), usa una comparación simple
+  validPassword = String(usuario.contrasena).trim() === contrasena;
+}
 
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
 
