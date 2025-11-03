@@ -18,6 +18,28 @@ const pool = new Pool({
 
 // ================== RUTAS ==================
 
+// Middleware para autenticar token
+const authenticateToken = (req, res, next) => {
+  // Obtiene el token del header 'Authorization'. Formato: "Bearer TOKEN"
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) {
+    return res.status(401).json({ error: "Token no proporcionado" });
+  }
+
+  // Verifica el token
+  jwt.verify(token, process.env.JWT_SECRET || "secreto123", (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: "Token inválido o expirado" });
+    }
+    
+    // Si es válido, guarda el payload del token (id, rut, rol) en req.user
+    req.user = user; 
+    next(); // Continúa con la siguiente función (la ruta)
+  });
+};
+
 // Ruta de prueba
 router.get("/", (req, res) => {
   res.send("API conectada a Neon 🚀");
@@ -182,6 +204,13 @@ router.post("/cursos/:cursoId/usuarios/:usuarioId", async (req, res) => {
 
 // ===================== INCIDENTES (INTEGRADO AQUÍ) =====================
 
+export const createIncident = (incidentData) => {
+  return apiFetch('/api/incidentes', {
+    method: 'POST',
+    body: JSON.stringify(incidentData),
+  });
+};
+
 // Validación de payload de incidente
 function assertIncidentePayload(body) {
   const errors = [];
@@ -192,7 +221,7 @@ function assertIncidentePayload(body) {
 }
 
 // Crear incidente
-app.post('/api/incidentes', authenticateToken, async (req, res) => {
+router.post('/incidentes', authenticateToken, async (req, res) => {
   try {
     assertIncidentePayload(req.body);
     const {
@@ -249,7 +278,7 @@ app.post('/api/incidentes', authenticateToken, async (req, res) => {
 });
 
 // Listar incidentes (filtros + paginación)
-app.get('/api/incidentes', authenticateToken, async (req, res) => {
+router.get('/incidentes', authenticateToken, async (req, res) => {
   try {
     const { idCurso, idAlumno, estado, from, to, page = 1, limit = 10 } = req.query;
 
@@ -292,7 +321,7 @@ app.get('/api/incidentes', authenticateToken, async (req, res) => {
 });
 
 // Detalle por ID
-app.get('/api/incidentes/:id', authenticateToken, async (req, res) => {
+router.get('/incidentes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const r = await pool.query(`SELECT * FROM incidentes WHERE id = $1`, [id]);
@@ -314,7 +343,7 @@ app.get('/api/incidentes/:id', authenticateToken, async (req, res) => {
 });
 
 // Actualizar incidente (parcial)
-app.patch('/api/incidentes/:id', authenticateToken, async (req, res) => {
+router.patch('/incidentes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
