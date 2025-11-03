@@ -10,7 +10,7 @@ const { Pool } = pkg;
 
 const router = Router();
 
-// Pool de conexión a Neon
+// Pool de conexión a Neon / Postgres
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false } // Necesario en Neon

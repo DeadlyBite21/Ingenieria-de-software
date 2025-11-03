@@ -1,0 +1,136 @@
+/* src/pages/Login.css */
+
+/* Fondo de la página (con tu imagen) */
+body.login-active {
+  background-image: url('../assets/login-background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-color: #1a1a2e; /* Fallback oscuro */
+}
+
+/* Contenedor para centrar el formulario */
+.login-container-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+/* --- ESTILOS DE LA TARJETA "GLASSMORPHISM" OSCURA --- */
+
+.login-card-simple {
+  max-width: 450px;
+  width: 100%;
+  
+  /* 1. Fondo oscuro semitransparente */
+  background-color: rgba(25, 20, 40, 0.75); /* Morado oscuro, 75% opacidad */
+  
+  /* 2. Efecto de desenfoque */
+  -webkit-backdrop-filter: blur(15px);
+  backdrop-filter: blur(15px);
+  
+  /* 3. Borde claro sutil */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  
+  border-radius: 1.25rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* --- ESTILOS PARA LOS ELEMENTOS DENTRO DE LA TARJETA --- */
+
+/* Icono (ahora es blanco) */
+.login-icon {
+  font-size: 2.5rem;
+  color: #ffffff;
+  margin-bottom: 0.5rem;
+}
+
+/* Título (ahora es blanco) */
+.login-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Subtítulo (ahora es gris claro) */
+.login-subtitle {
+  font-size: 1rem;
+  color: #e0e0e0;
+  margin-bottom: 2rem;
+}
+
+/* Labels (RUT, Contraseña) (ahora son gris claro) */
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+/* Inputs (oscuros, semitransparentes, con texto blanco) */
+.input-group .form-control {
+  background-color: rgba(0, 0, 0, 0.25);
+  color: #ffffff; /* Color del texto que escribes */
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Placeholder (texto de "RUT" o "Contraseña") */
+.input-group .form-control::placeholder {
+  color: #adb5bd;
+}
+
+/* Borde del Input al hacer focus */
+.input-group .form-control:focus {
+  background-color: rgba(0, 0, 0, 0.4);
+  color: #ffffff;
+  border-color: #a0a0ff; /* Borde morado claro al seleccionar */
+  box-shadow: 0 0 0 0.25rem rgba(160, 160, 255, 0.25);
+}
+
+/* Iconos de RUT y Contraseña */
+.input-group .input-group-text {
+  background-color: rgba(197, 197, 211, 0.25);
+  border-color: rgba(200, 106, 106, 0.191);
+  color: #ffffff;
+}
+
+/* Checkbox (ahora es gris claro) */
+.form-check-label {
+  font-size: 0.9rem;
+  color: #e0e0e0;
+}
+
+/* Enlace "Forgot password?" (ahora es morado claro) */
+.custom-link-purple {
+  color: #d0d0ff;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.custom-link-purple:hover {
+  text-decoration: underline;
+}
+
+/* --- NUEVO BOTÓN BLANCO --- */
+/* Botón de "Ingresar" (blanco sólido con texto oscuro) */
+.btn-custom-light {
+  background-color: #ffffff;
+  border-color: #ffffff;
+  color: #212529; /* Texto oscuro */
+  padding: 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+}
+
+.btn-custom-light:hover {
+  background-color: #f0f0f0; /* Un poco más oscuro al pasar el mouse */
+  border-color: #f0f0f0;
+  color: #212529;
+}
+
+.btn-custom-light:disabled {
+  background-color: #e0e0e0;
+  border-color: #e0e0e0;
+}

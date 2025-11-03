@@ -1,0 +1,72 @@
+/* src/components/DashboardLayout.css */
+
+/*
+  Añade un fondo claro a la sección del dashboard
+  para anular el fondo oscuro por defecto de src/index.css
+*/
+body.dashboard-active {
+  background-color: #f8f9fa; /* Un gris claro */
+  color: #212529; /* Color de texto oscuro por defecto */
+}
+
+.dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* --- Estilos del Menú Lateral (Sidebar) --- */
+.sidebar {
+  width: 260px; /* Ancho del menú */
+  background-color: #212529; /* Fondo oscuro (puedes cambiarlo) */
+  color: #ffffff; /* Texto blanco */
+  position: fixed; /* Fijo en la pantalla */
+  top: 0;
+  left: 0;
+  height: 100vh;
+  padding: 1.5rem 1rem;
+  
+  /* Usamos flexbox para alinear el botón de logout abajo */
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-profile {
+  text-align: center;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid #495057; /* Separador sutil */
+  padding-bottom: 1.5rem;
+}
+
+.sidebar-profile .profile-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.sidebar-profile .profile-role {
+  font-size: 0.9rem;
+  color: #adb5bd; /* Texto de rol en gris claro */
+}
+
+/* Este div ocupa todo el espacio "vacío" */
+.sidebar-menu {
+  flex-grow: 1; 
+  /* Aquí es donde pondrás tus futuros enlaces (ej. "Inicio", "Cursos", "Perfil") */
+}
+
+.sidebar-logout {
+  /* Este div se queda al final gracias al flex-grow de .sidebar-menu */
+}
+
+.btn-logout {
+  width: 100%;
+}
+
+/* --- Estilos del Contenido Principal --- */
+.dashboard-content {
+  /* Dejamos un margen a la izquierda igual al ancho del sidebar */
+  margin-left: 260px; 
+  flex-grow: 1;
+  padding: 2rem;
+  width: calc(100% - 260px); /* Asegura que el contenido ocupe el resto */
+}
