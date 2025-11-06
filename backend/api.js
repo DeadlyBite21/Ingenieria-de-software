@@ -43,7 +43,7 @@ function isAdmin(req, res, next) {
 
 // Ruta de prueba
 router.get("/", (req, res) => {
-  res.send("API conectada a Neon 🚀");
+  res.send("API conectada a Neon");
 });
 
 // Login
@@ -80,7 +80,7 @@ router.post("/login", async (req, res) => {
     );
 
     res.json({
-      message: "Inicio de sesión exitoso 🚀",
+      message: "Inicio de sesión exitoso",
       usuario: {
         id: usuario.id,
         rut: usuario.rut,
@@ -133,6 +133,20 @@ router.post("/usuarios/crear", authenticateToken, isAdmin, async (req, res) => {
   if (![0, 1, 2].includes(rol) || !rut || !nombre || !correo || !contrasena) {
     return res.status(400).json({ error: "Faltan datos o el rol es inválido" });
   }
+if(contrasena.length < 6) {
+  return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+}
+for(let i = 0; i < contrasena.length; i++) {
+  if(contrasena[i] === ' ') {
+    return res.status(400).json({ error: "La contraseña no puede contener espacios" });
+  }
+}
+const specialCharRegex = /[%&\$#@!]/;
+//Comprueba si la contraseña NO contiene (.test() da false) ninguno de esos caracteres.
+if (!specialCharRegex.test(contrasena)) {
+  // 3. Si no encontró ninguno, retorna el error.
+  return res.status(400).json({ error: "La contraseña debe contener al menos un carácter especial (%&$#@!)" });
+}
 
   try {
     const hashedPassword = await bcrypt.hash(contrasena, 10);
@@ -215,7 +229,7 @@ router.post("/usuarios/cambiar-contraseña", authenticateToken, isAdmin, async (
       return res.status(404).json({ error: "Usuario no encontrado" });
 
     res.json({
-      message: "Contraseña actualizada con éxito 🚀",
+      message: "Contraseña actualizada con éxito",
       usuario: result.rows[0],
     });
   } catch (err) {
@@ -236,7 +250,7 @@ router.post("/cursos/crear", authenticateToken, isAdmin, async (req, res) => {
       "INSERT INTO cursos (nombre) VALUES ($1) RETURNING *",
       [nombre]
     );
-    res.status(201).json({ message: "Curso creado con éxito 🚀", curso: result.rows[0] });
+    res.status(201).json({ message: "Curso creado con éxito", curso: result.rows[0] });
   } catch (err) {
     if (err.code === "23505") return res.status(400).json({ error: "El curso ya existe" });
     console.error(err);
@@ -320,7 +334,7 @@ router.post("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin, 
       [usuarioId, cursoId]
     );
 
-    res.json({ message: "Usuario asignado al curso con éxito 🚀", asignacion: result.rows[0] });
+    res.json({ message: "Usuario asignado al curso con éxito", asignacion: result.rows[0] });
   } catch (err) {
     if (err.code === "23505") return res.status(400).json({ error: "El usuario ya está en este curso" });
     console.error(err);
@@ -342,7 +356,7 @@ router.delete("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin
       return res.status(404).json({ error: "Asignación no encontrada" });
     }
 
-    res.json({ message: "Usuario desasignado del curso con éxito 🚀" });
+    res.json({ message: "Usuario desasignado del curso con éxito" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error en el servidor" });
