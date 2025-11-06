@@ -22,13 +22,13 @@ export const apiFetch = async (url, options = {}) => {
 };
 
 // Función específica para login
-export const loginUser = async (rut, contrasena) => {
+export const loginUser = async (identificador, contrasena) => {
   const response = await fetch(`${API_BASE_URL}/api/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ rut, contrasena }),
+    body: JSON.stringify({ identificador, contrasena }),
   });
 
   if (!response.ok) {

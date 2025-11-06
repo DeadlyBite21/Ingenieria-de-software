@@ -48,11 +48,14 @@ router.get("/", (req, res) => {
 
 // Login
 router.post("/login", async (req, res) => {
-  const { rut, contrasena } = req.body;
-  if (!rut || !contrasena) return res.status(400).json({ error: "Falta rut o contraseña" });
+  const { identificador, contrasena } = req.body;
+  if (!identificador || !contrasena) return res.status(400).json({ error: "Falta rut o contraseña" });
 
   try {
-    const result = await pool.query("SELECT * FROM usuarios WHERE rut = $1", [rut]);
+    const result = await pool.query(
+      "SELECT * FROM usuarios WHERE rut::text = $1 OR correo = $1", 
+      [identificador]
+    );
 
     if (result.rows.length === 0)
       return res.status(401).json({ error: "Usuario no encontrado" });
