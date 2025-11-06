@@ -28,7 +28,11 @@ export default function AdminDashboard() {
   const [showAssignUser, setShowAssignUser] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedUser, setSelectedUser] = useState('');
-  const [courseUsers, setCourseUsers] = useState({});
+  const [courseUsers, setCourseUsers] = useState({}); // { [cursoId]: [lista_de_usuarios] }
+
+  // --- 1. ESTADOS DE FILTROS ACTUALIZADOS ---
+  const [filtroRol, setFiltroRol] = useState('alumnos'); // <-- Inicia en 'alumnos' como pediste
+  const [filtroCurso, setFiltroCurso] = useState(''); // <-- NUEVO ESTADO para el dropdown de curso
 
   useEffect(() => {
     loadData();
@@ -61,6 +65,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- (Tus funciones handle... (handleCreateUser, etc.) permanecen sin cambios) ---
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
@@ -157,12 +162,65 @@ export default function AdminDashboard() {
       }
     }
   };
+  // --- FIN de tus funciones handle ---
+
+  // --- 2. LÓGICA DE FILTRADO ACTUALIZADA ---
+  const usuariosFiltrados = usuarios.filter(u => {
+    let pasaFiltroRol = false;
+
+    // --- Filtro de Rol ---
+    if (filtroRol === 'todos') {
+      pasaFiltroRol = true;
+    } else if (filtroRol === 'alumnos' && u.rol === 2) {
+      pasaFiltroRol = true;
+    } else if (filtroRol === 'profesores' && u.rol === 1) {
+      pasaFiltroRol = true;
+    } else if (filtroRol === 'admins' && u.rol === 0) {
+      pasaFiltroRol = true;
+    }
+
+    if (!pasaFiltroRol) return false; // Si no pasa el rol, se descarta
+
+    // --- NUEVO Filtro de Curso (SOLO si el filtro de rol es 'alumnos') ---
+    if (filtroRol === 'alumnos' && filtroCurso) {
+      // Si hay un curso seleccionado (ej: "5")
+      // 1. Obtenemos la lista de usuarios para ese curso (ej: [user1, user8, user12])
+      const usuariosDelCurso = courseUsers[filtroCurso] || [];
+      
+      // 2. Comprobamos si el usuario actual 'u' está en esa lista
+      return usuariosDelCurso.some(userInCourse => userInCourse.id === u.id);
+    }
+    
+    // Si pasó el filtro de rol y no aplica el filtro de curso, se muestra
+    return true;
+  });
+
+  // Función para estilo de botones de filtro
+  const getFiltroBtnStyle = (tipo) => ({
+    padding: '8px 12px',
+    backgroundColor: filtroRol === tipo ? '#007bff' : '#f8f9fa',
+    color: filtroRol === tipo ? 'white' : '#333',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: filtroRol === tipo ? 'bold' : 'normal',
+    marginRight: '8px'
+  });
+
+  // --- 3. NUEVA FUNCIÓN para manejar el clic en los botones de rol ---
+  // (Resetea el filtro de curso si se selecciona algo que no sea "Alumnos")
+  const cambiarFiltroRol = (nuevoRol) => {
+    setFiltroRol(nuevoRol);
+    if (nuevoRol !== 'alumnos') {
+      setFiltroCurso(''); // Limpiamos el filtro de curso
+    }
+  };
+
 
   if (loading) return <div style={{ padding: 16 }}>Cargando...</div>;
   if (error) return <div style={{ padding: 16, color: 'red' }}>Error: {error}</div>;
 
   return (
-    // ¡HEMOS QUITADO EL STYLE DE ESTE DIV!
     <div>
       <h1>Panel de Administrador</h1>
       <p style={{ marginBottom: '2rem', color: '#666' }}>
@@ -190,14 +248,9 @@ export default function AdminDashboard() {
 
         {showCreateUser && (
           <form onSubmit={handleCreateUser} style={{ 
-            backgroundColor: '#f8f9fa', 
-            padding: '1rem', 
-            borderRadius: '8px', 
-            marginBottom: '1rem',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem'
+            /* ... (estilos del formulario sin cambios) ... */
           }}>
+            {/* ... (Inputs del formulario crear usuario sin cambios) ... */}
             <select
               value={newUser.rol}
               onChange={(e) => setNewUser({...newUser, rol: parseInt(e.target.value)})}
@@ -254,9 +307,61 @@ export default function AdminDashboard() {
           </form>
         )}
 
+        {/* --- 4. ÁREA DE FILTROS ACTUALIZADA --- */}
+        <div style={{ 
+          marginBottom: '1rem', 
+          display: 'flex', 
+          alignItems: 'center', 
+          flexWrap: 'wrap', 
+          gap: '1rem', 
+          backgroundColor: '#f8f9fa', 
+          padding: '1rem', 
+          borderRadius: '8px' 
+        }}>
+          {/* Botones de Rol */}
+          <div>
+            <span style={{ marginRight: '1rem', fontWeight: 'bold' }}>Filtrar por Rol:</span>
+            <button style={getFiltroBtnStyle('todos')} onClick={() => cambiarFiltroRol('todos')}>
+              Todos ({usuarios.length})
+            </button>
+            <button style={getFiltroBtnStyle('alumnos')} onClick={() => cambiarFiltroRol('alumnos')}>
+              Alumnos ({usuarios.filter(u => u.rol === 2).length})
+            </button>
+            <button style={getFiltroBtnStyle('profesores')} onClick={() => cambiarFiltroRol('profesores')}>
+              Profesores ({usuarios.filter(u => u.rol === 1).length})
+            </button>
+            <button style={getFiltroBtnStyle('admins')} onClick={() => cambiarFiltroRol('admins')}>
+              Admins ({usuarios.filter(u => u.rol === 0).length})
+            </button>
+          </div>
+
+          {/* NUEVO: Dropdown de Cursos (Solo si 'alumnos' está activo) */}
+          {filtroRol === 'alumnos' && (
+            <div style={{ marginLeft: 'auto' }}>
+              <label style={{ marginRight: '0.5rem', fontWeight: 'bold' }}>
+                Filtrar por Curso:
+              </label>
+              <select
+                value={filtroCurso}
+                onChange={(e) => setFiltroCurso(e.target.value)}
+                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+              >
+                <option value="">Todos los Cursos</option>
+                {cursos.map(curso => (
+                  <option key={curso.id} value={curso.id}>
+                    {curso.nombre} (ID: {curso.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ddd' }}>
             <thead>
+              {/* ... (Cabecera de tabla sin cambios) ... */}
               <tr style={{ backgroundColor: '#f8f9fa' }}>
                 <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>RUT</th>
                 <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Nombre</th>
@@ -266,39 +371,49 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {usuarios.map((usuario) => (
-                <tr key={usuario.id}>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>{usuario.rut}</td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>{usuario.nombre}</td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>{usuario.correo}</td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd' }}>
-                    {usuario.rol === 0 ? 'Administrador' : usuario.rol === 1 ? 'Profesor' : 'Alumno'}
-                  </td>
-                  <td style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'center' }}>
-                    <button
-                      onClick={() => handleDeleteUser(usuario.id, usuario.nombre)}
-                      style={{
-                        padding: '4px 8px',
-                        backgroundColor: '#dc3545',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      🗑️ Eliminar
-                    </button>
+              {/* --- 5. USAMOS LA LISTA FILTRADA --- */}
+              {usuariosFiltrados.length > 0 ? (
+                usuariosFiltrados.map((usuario) => (
+                  <tr key={usuario.id}>
+                    <td style={{ padding: '12px', border: '1px solid #ddd' }}>{usuario.rut}</td>
+                    <td style={{ padding: '12px', border: '1px solid #ddd' }}>{usuario.nombre}</td>
+                    <td style={{ padding: '12px', border: '1px solid #ddd' }}>{usuario.correo}</td>
+                    <td style={{ padding: '12px', border: '1px solid #ddd' }}>
+                      {usuario.rol === 0 ? 'Administrador' : usuario.rol === 1 ? 'Profesor' : 'Alumno'}
+                    </td>
+                    <td style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'center' }}>
+                      <button
+                        onClick={() => handleDeleteUser(usuario.id, usuario.nombre)}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        🗑️ Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" style={{ padding: '16px', textAlign: 'center', fontStyle: 'italic' }}>
+                    No hay usuarios que coincidan con los filtros seleccionados.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Sección de Cursos */}
+      {/* --- Sección de Cursos (sin cambios) --- */}
       <div>
+        {/* ... (Tu código de Gestión de Cursos sigue aquí) ... */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2>Gestión de Cursos</h2>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
