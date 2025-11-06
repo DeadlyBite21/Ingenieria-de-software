@@ -15,7 +15,7 @@ import { HouseDoorFill, PersonVcard, LockFill } from 'react-bootstrap-icons';
 
 function LoginForm() {
   // --- Tu lógica existente (no se toca) ---
-  const [rut, setRut] = useState("");
+  const [identificador, setIdentificador] = useState("");
   const [contrasena, setContrasena] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,7 @@ function LoginForm() {
     setError(null);
     setLoading(true);
     try {
-      await login(rut, contrasena);
+      await login(identificador, contrasena);
       navigate("/dashboard");
     } catch (err) {
       
@@ -60,12 +60,12 @@ function LoginForm() {
 
           {/* Campo RUT */}
           <Form.Group className="mb-3" controlId="formBasicRut">
-            <Form.Label>RUT</Form.Label>
+            <Form.Label>RUT o Correo</Form.Label>
             <InputGroup>
               <Form.Control
                 type="text"
-                value={rut}
-                onChange={(e) => setRut(e.target.value)}
+                value={identificador}
+                onChange={(e) => setIdentificador(e.target.value)}
                 required
                 disabled={loading}
               />
@@ -94,14 +94,7 @@ function LoginForm() {
 
           {/* Opciones (Remember me / Forgot password) */}
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <Form.Check 
-              type="checkbox"
-              id="rememberCheck"
-              label="Remember for 30 days"
-              disabled={loading}
-              className="form-check-label"
-            />
-            <a href="/recover-password" className="custom-link-purple">Forgot password?</a>
+            <a href="/recover-password" className="custom-link-purple">Olvidaste la contraseña?</a>
           </div>
 
           {/* Botón Login */}

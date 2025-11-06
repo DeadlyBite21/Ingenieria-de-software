@@ -37,9 +37,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = async (rut, contrasena) => {
+  const login = async (identificador, contrasena) => {
     try {
-      const response = await loginUser(rut, contrasena);
+      const response = await loginUser(identificador, contrasena);
       
       // Guardar token y datos del usuario
       localStorage.setItem('token', response.token);
