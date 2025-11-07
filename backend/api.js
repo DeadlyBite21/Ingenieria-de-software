@@ -43,7 +43,7 @@ function isAdmin(req, res, next) {
 
 // Ruta de prueba
 router.get("/", (req, res) => {
-  res.send("API conectada a Neon 🚀");
+  res.send("API conectada a Neon");
 });
 
 // Login
@@ -80,7 +80,7 @@ router.post("/login", async (req, res) => {
     );
 
     res.json({
-      message: "Inicio de sesión exitoso 🚀",
+      message: "Inicio de sesión exitoso",
       usuario: {
         id: usuario.id,
         rut: usuario.rut,
@@ -133,6 +133,20 @@ router.post("/usuarios/crear", authenticateToken, isAdmin, async (req, res) => {
   if (![0, 1, 2].includes(rol) || !rut || !nombre || !correo || !contrasena) {
     return res.status(400).json({ error: "Faltan datos o el rol es inválido" });
   }
+if(contrasena.length < 6) {
+  return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+}
+for(let i = 0; i < contrasena.length; i++) {
+  if(contrasena[i] === ' ') {
+    return res.status(400).json({ error: "La contraseña no puede contener espacios" });
+  }
+}
+const specialCharRegex = /[%&\$#@!]/;
+//Comprueba si la contraseña NO contiene (.test() da false) ninguno de esos caracteres.
+if (!specialCharRegex.test(contrasena)) {
+  // 3. Si no encontró ninguno, retorna el error.
+  return res.status(400).json({ error: "La contraseña debe contener al menos un carácter especial (%&$#@!)" });
+}
 
   try {
     const hashedPassword = await bcrypt.hash(contrasena, 10);
@@ -215,7 +229,7 @@ router.post("/usuarios/cambiar-contraseña", authenticateToken, isAdmin, async (
       return res.status(404).json({ error: "Usuario no encontrado" });
 
     res.json({
-      message: "Contraseña actualizada con éxito 🚀",
+      message: "Contraseña actualizada con éxito",
       usuario: result.rows[0],
     });
   } catch (err) {
@@ -236,7 +250,7 @@ router.post("/cursos/crear", authenticateToken, isAdmin, async (req, res) => {
       "INSERT INTO cursos (nombre) VALUES ($1) RETURNING *",
       [nombre]
     );
-    res.status(201).json({ message: "Curso creado con éxito 🚀", curso: result.rows[0] });
+    res.status(201).json({ message: "Curso creado con éxito", curso: result.rows[0] });
   } catch (err) {
     if (err.code === "23505") return res.status(400).json({ error: "El curso ya existe" });
     console.error(err);
@@ -320,7 +334,7 @@ router.post("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin, 
       [usuarioId, cursoId]
     );
 
-    res.json({ message: "Usuario asignado al curso con éxito 🚀", asignacion: result.rows[0] });
+    res.json({ message: "Usuario asignado al curso con éxito", asignacion: result.rows[0] });
   } catch (err) {
     if (err.code === "23505") return res.status(400).json({ error: "El usuario ya está en este curso" });
     console.error(err);
@@ -342,7 +356,7 @@ router.delete("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin
       return res.status(404).json({ error: "Asignación no encontrada" });
     }
 
-    res.json({ message: "Usuario desasignado del curso con éxito 🚀" });
+    res.json({ message: "Usuario desasignado del curso con éxito" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error en el servidor" });
@@ -669,5 +683,114 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
+// Listar todas las encuestas (para el usuario logueado)
+// Listar todas las encuestas (para el usuario logueado)
+router.get('/encuestas', authenticateToken, async (req, res) => {
+  try {
+    let query;
+    // 1. INICIAMOS 'values' COMO UN ARRAY VACÍO
+    const values = []; 
+
+    if (req.user.rol === 0) {
+      // Admin ve todas (Esta consulta no usa parámetros)
+      query = `SELECT e.*, c.nombre as nombre_curso 
+               FROM encuestas e
+               JOIN cursos c ON e.id_curso = c.id
+               ORDER BY e.fecha_creacion DESC`;
+      // No añadimos nada a 'values'
+    } else if (req.user.rol === 1) {
+      // Profesor ve las que creó
+      query = `SELECT e.*, c.nombre as nombre_curso 
+               FROM encuestas e
+               JOIN cursos c ON e.id_curso = c.id
+               WHERE e.creado_por = $1
+               ORDER BY e.fecha_creacion DESC`;
+      // 2. AÑADIMOS EL VALOR SOLO CUANDO SE NECESITA
+      values.push(req.user.id); 
+    } else {
+      // Alumno ve las de sus cursos
+      query = `SELECT e.*, c.nombre as nombre_curso 
+               FROM encuestas e
+               JOIN cursos c ON e.id_curso = c.id
+               WHERE e.estado = 'publicada' AND e.id_curso IN (
+                 SELECT curso_id FROM curso_usuarios WHERE usuario_id = $1
+               )
+               ORDER BY e.fecha_creacion DESC`;
+      // 3. AÑADIMOS EL VALOR SOLO CUANDO SE NECESITA
+      values.push(req.user.id); 
+    }
+    
+    // Ahora la llamada es correcta:
+    // Si es Admin: pool.query(query, [])
+    // Si es Profesor/Alumno: pool.query(query, [userId])
+    const result = await pool.query(query, values);
+    res.json(result.rows);
+
+  } catch (e) {
+    // También mejoramos el JSON de error para que sea más limpio
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Crear una nueva encuesta (Profesor o Admin)
+router.post('/encuestas', authenticateToken, async (req, res) => {
+  // Alumnos (rol 2) no pueden crear
+  if (req.user.rol === 2) {
+    return res.status(403).json({ error: "No tienes permisos para crear encuestas." });
+  }
+
+  const { idCurso, titulo, descripcion, preguntas } = req.body;
+  
+  if (!idCurso || !titulo || !preguntas || preguntas.length === 0) {
+    return res.status(400).json({ error: "Faltan datos (idCurso, titulo, preguntas)" });
+  }
+
+  // Si es Profesor, verificar que el curso le pertenece
+  if (req.user.rol === 1) {
+    const check = await pool.query(
+      "SELECT 1 FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2",
+      [req.user.id, idCurso]
+    );
+    if (check.rowCount === 0) {
+      return res.status(403).json({ error: "No puedes crear encuestas para un curso que no administras." });
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // 1. Insertar la encuesta
+    const encuestaRes = await client.query(
+      `INSERT INTO encuestas (id_curso, creado_por, titulo, descripcion, estado)
+       VALUES ($1, $2, $3, $4, 'publicada')
+       RETURNING id`,
+      [idCurso, req.user.id, titulo, descripcion]
+    );
+    
+    const idEncuesta = encuestaRes.rows[0].id;
+    
+    // 2. Insertar las preguntas
+    const queryPreguntas = `
+      INSERT INTO preguntas (id_encuesta, texto, tipo_pregunta, orden)
+      VALUES ($1, $2, $3, $4)
+    `;
+    
+    for (let i = 0; i < preguntas.length; i++) {
+      const p = preguntas[i];
+      if (!p.texto || !p.tipo_pregunta) throw new Error("Pregunta inválida.");
+      await client.query(queryPreguntas, [idEncuesta, p.texto, p.tipo_pregunta, i + 1]);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ message: "Encuesta creada exitosamente", idEncuesta });
+    
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
 
 export default router;

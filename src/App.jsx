@@ -12,10 +12,10 @@ import DashboardLayout from "./components/DashboardLayout"; // Necesario para la
 import IncidentsPage from "./pages/IncidentsPage";
 import IncidentCreatePage from "./pages/IncidentCreatePage";
 import IncidentDetailPage from "./pages/IncidentDetailPage";
-// --- IMPORTACIONES DE RECUPERACIÓN AÑADIDAS ---
 import RecoverPassword from './pages/RecoverPassword';
 import ResetPassword from './pages/ResetPassword';
-// --- FIN DE IMPORTACIONES AÑADIDAS ---
+import EncuestasListPage from "./pages/EncuestasListPage";
+import CrearEncuestaPage from "./pages/CrearEncuestaPage";
 
 // El componente Home (demo de Vite) sigue igual
 function Home() {
@@ -118,7 +118,7 @@ function App() {
               </ProtectedRoute>
             } 
           />
-<Route 
+          <Route 
             path="/dashboard/incidentes" 
             element={
               <ProtectedRoute>
@@ -160,6 +160,28 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <IncidentDetailPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/dashboard/encuestas" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <EncuestasListPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/dashboard/encuestas/crear" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <CrearEncuestaPage />
                 </DashboardLayout>
               </ProtectedRoute>
             } 
