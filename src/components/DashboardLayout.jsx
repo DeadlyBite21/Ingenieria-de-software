@@ -2,13 +2,13 @@ import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import Button from 'react-bootstrap/Button';
-import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill } from 'react-bootstrap-icons';
+import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill, ClipboardCheck } from 'react-bootstrap-icons';
 import './DashboardLayout.css'; // Importamos los nuevos estilos
 
 // Este componente "envolverá" a tus dashboards (Admin y User)
 export default function DashboardLayout({ children }) {
   // Obtenemos el usuario y la función logout del contexto
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin, isProfesor } = useAuth();
   const navigate = useNavigate();
 
   // Hook para añadir la clase al body y poner el fondo claro
@@ -60,6 +60,12 @@ export default function DashboardLayout({ children }) {
           >
             <ExclamationOctagonFill className="me-2" /> Incidentes
           </Link>
+          <Link 
+              to="/dashboard/encuestas" 
+              className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
+            >
+              <ClipboardCheck className="me-2" /> Encuestas
+            </Link>
         </div>
 
         {/* 3. Botón de Cerrar Sesión (al final) */}
