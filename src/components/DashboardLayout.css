@@ -17,50 +17,129 @@ body.dashboard-active {
 /* --- Estilos del Menú Lateral (Sidebar) --- */
 .sidebar {
   width: 260px; /* Ancho del menú */
-  background-color: #212529; /* Fondo oscuro (puedes cambiarlo) */
-  color: #ffffff; /* Texto blanco */
-  position: fixed; /* Fijo en la pantalla */
+  /* Color de fondo oscuro (inspirado en tu imagen) */
+  background-color: #1a1f27; 
+  color: #e0e0e0; /* Color de texto general (gris claro) */
+  position: fixed;
   top: 0;
   left: 0;
   height: 100vh;
-  padding: 1.5rem 1rem;
+  padding: 1rem;
   
-  /* Usamos flexbox para alinear el botón de logout abajo */
   display: flex;
   flex-direction: column;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  transition: width 0.2s ease;
 }
 
+/* --- Perfil (Arriba) --- */
 .sidebar-profile {
-  text-align: center;
-  margin-bottom: 2rem;
-  border-bottom: 1px solid #495057; /* Separador sutil */
+  text-align: left; /* Alinear a la izquierda */
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #343a40; /* Separador oscuro */
+  padding: 0.5rem 0.75rem;
   padding-bottom: 1.5rem;
 }
 
 .sidebar-profile .profile-name {
-  font-size: 1.2rem;
+  font-size: 1rem; /* Un poco más pequeño */
   font-weight: 600;
   margin: 0;
+  color: #ffffff; /* Nombre en blanco */
 }
 
 .sidebar-profile .profile-role {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   color: #adb5bd; /* Texto de rol en gris claro */
 }
 
-/* Este div ocupa todo el espacio "vacío" */
+/* --- Menú (Centro) --- */
 .sidebar-menu {
   flex-grow: 1; 
-  /* Aquí es donde pondrás tus futuros enlaces (ej. "Inicio", "Cursos", "Perfil") */
+  padding: 0 0.5rem; /* Padding para los enlaces */
 }
 
-.sidebar-logout {
-  /* Este div se queda al final gracias al flex-grow de .sidebar-menu */
-}
+/* --- ESTILOS DE LOS ENLACES (¡LO MÁS IMPORTANTE!) ---
+  Sobrescribimos las clases .btn y .btn-link de Bootstrap
+*/
+.sidebar-menu .btn.btn-link {
+  /* 1. Reseteamos los estilos de Bootstrap */
+  color: #adb5bd; /* Color de icono/texto inactivo */
+  text-decoration: none;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
 
-.btn-logout {
+  /* 2. Estilos nuevos (como la imagen) */
+  display: flex;
+  align-items: center;
   width: 100%;
+  padding: 0.8rem 0.75rem; /* Padding uniforme */
+  margin-bottom: 0.25rem; /* Espacio entre botones */
+  border-radius: 8px; /* Bordes redondeados */
+  font-weight: 500;
+  font-size: 0.95rem;
+  text-align: left;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* Iconos dentro de los enlaces */
+.sidebar-menu .btn.btn-link svg {
+  font-size: 1.1rem; /* Tamaño del icono */
+  margin-right: 0.8rem; /* Espacio entre icono y texto */
+  transition: transform 0.2s ease;
+}
+
+/* Hover y Focus (estado "sobre" el botón) */
+.sidebar-menu .btn.btn-link:hover,
+.sidebar-menu .btn.btn-link:focus {
+  background-color: #2c333d; /* Fondo sutil al pasar el mouse */
+  color: #ffffff; /* Texto se vuelve blanco */
+}
+
+/* (Opcional) Si quieres que el ícono se mueva un poco al pasar el mouse */
+.sidebar-menu .btn.btn-link:hover svg {
+  transform: scale(1.05);
+}
+
+
+/* --- Logout (Abajo) --- */
+.sidebar-logout {
+  padding: 0 0.5rem; /* Mismo padding que el menú */
+}
+
+/* Sobrescribimos .btn-danger y .btn-logout
+*/
+.btn-logout.btn-danger {
+  /* 1. Reset de estilos de Bootstrap */
+  border: none;
+  box-shadow: none;
+  
+  /* 2. Estilos nuevos */
+  background-color: transparent; /* Sin fondo */
+  color: #adb5bd; /* Mismo color que los enlaces */
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0.8rem 0.75rem;
+  margin-top: 1rem;
+  border-top: 1px solid #343a40; /* Separador superior */
+  border-radius: 0; /* Sin bordes redondeados */
+  font-weight: 500;
+  font-size: 0.95rem;
+  justify-content: flex-start; /* Alinear a la izquierda */
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-logout.btn-danger:hover {
+  background-color: transparent;
+  color: #ff6b6b; /* Color rojo al pasar el mouse */
+}
+
+.btn-logout.btn-danger svg {
+  margin-right: 0.8rem;
+}
+
 
 /* --- Estilos del Contenido Principal --- */
 .dashboard-content {
@@ -69,4 +148,5 @@ body.dashboard-active {
   flex-grow: 1;
   padding: 2rem;
   width: calc(100% - 260px); /* Asegura que el contenido ocupe el resto */
+  transition: margin-left 0.2s ease, width 0.2s ease;
 }

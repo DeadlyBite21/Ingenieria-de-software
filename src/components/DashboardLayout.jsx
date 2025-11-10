@@ -2,13 +2,19 @@ import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import Button from 'react-bootstrap/Button';
-import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill, ClipboardCheck } from 'react-bootstrap-icons';
+import { 
+  BoxArrowRight, 
+  HouseDoorFill, 
+  ExclamationOctagonFill, 
+  ClipboardCheck,
+  PeopleFill // <-- ICONO AÑADIDO
+} from 'react-bootstrap-icons';
 import './DashboardLayout.css'; // Importamos los nuevos estilos
 
 // Este componente "envolverá" a tus dashboards (Admin y User)
 export default function DashboardLayout({ children }) {
   // Obtenemos el usuario y la función logout del contexto
-  const { user, logout, isAdmin, isProfesor } = useAuth();
+  const { user, logout, isAdmin, isProfesor } = useAuth(); // isAdmin se usa aquí
   const navigate = useNavigate();
 
   // Hook para añadir la clase al body y poner el fondo claro
@@ -54,6 +60,18 @@ export default function DashboardLayout({ children }) {
           >
             <HouseDoorFill className="me-2" /> Inicio
           </Link>
+          
+          {/* --- BLOQUE AÑADIDO PARA USUARIOS (SOLO ADMIN) --- */}
+          {isAdmin && (
+            <Link 
+              to="/dashboard/usuarios" 
+              className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
+            >
+              <PeopleFill className="me-2" /> Usuarios
+            </Link>
+          )}
+          {/* --- FIN DEL BLOQUE --- */}
+
           <Link 
             to="/dashboard/incidentes" 
             className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"

@@ -16,6 +16,7 @@ import RecoverPassword from './pages/RecoverPassword';
 import ResetPassword from './pages/ResetPassword';
 import EncuestasListPage from "./pages/EncuestasListPage";
 import CrearEncuestaPage from "./pages/CrearEncuestaPage";
+import UsuariosPage from './pages/UsuariosPage'; // <-- IMPORTACIÓN AÑADIDA
 
 // El componente Home (demo de Vite) sigue igual
 function Home() {
@@ -182,6 +183,18 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <CrearEncuestaPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* --- RUTA DE USUARIOS AÑADIDA --- */}
+          <Route 
+            path="/dashboard/usuarios" 
+            element={
+              <ProtectedRoute requiredRole={0}> {/* Solo Admins */}
+                <DashboardLayout>
+                  <UsuariosPage />
                 </DashboardLayout>
               </ProtectedRoute>
             } 
