@@ -17,8 +17,10 @@ If you are developing a production application, we recommend using TypeScript wi
 Para iniciar o correr el frontend:
 ```bash
 npm run dev
+```
 
 ### Backend
 Para iniciar el backend
 ```bash
 node index.js
+```
