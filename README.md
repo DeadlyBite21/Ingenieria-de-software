@@ -14,13 +14,29 @@ If you are developing a production application, we recommend using TypeScript wi
 ## Ejecución del proyecto
 
 ### Frontend
-Para iniciar o correr el frontend:
+Instalar Vite:
+```bash
+npm install vite
+```
+
+Iniciar el Frontend:
 ```bash
 npm run dev
 ```
 
 ### Backend
-Para iniciar el backend
+Instalar JsonWebToken:
+
+```bash
+npm install jsonwebtoken
+```
+Instalar JsonWebToken:
+
+```bash
+npm install node-fetch
+```
+
+Iniciar el Backend:
 ```bash
 node index.js
 ```
