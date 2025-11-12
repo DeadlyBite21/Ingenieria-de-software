@@ -1,20 +1,23 @@
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, NavLink } from 'react-router-dom';
 import Button from 'react-bootstrap/Button';
-import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill, ClipboardCheck } from 'react-bootstrap-icons';
-import './DashboardLayout.css'; // Importamos los nuevos estilos
+import { 
+  BoxArrowRight, 
+  HouseDoorFill, 
+  ExclamationOctagonFill, 
+  ClipboardCheck,
+  PeopleFill,
+  BoxFill // Icono para el "logo"
+} from 'react-bootstrap-icons';
+import './DashboardLayout.css'; // Importamos los estilos actualizados
 
-// Este componente "envolverá" a tus dashboards (Admin y User)
 export default function DashboardLayout({ children }) {
-  // Obtenemos el usuario y la función logout del contexto
-  const { user, logout, isAdmin, isProfesor } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  // Hook para añadir la clase al body y poner el fondo claro
   useEffect(() => {
     document.body.classList.add('dashboard-active');
-    // Función de limpieza para cuando salgamos del dashboard
     return () => {
       document.body.classList.remove('dashboard-active');
     };
@@ -22,12 +25,11 @@ export default function DashboardLayout({ children }) {
 
   const handleLogout = () => {
     logout();
-    navigate('/login'); // Redirigimos al login
+    navigate('/login');
   };
 
-  // Función para obtener el texto del rol
-  const getRolText = () => {
-    switch (user?.rol) {
+  const getRolText = (rol) => {
+    switch (rol) {
       case 0: return 'Administrador';
       case 1: return 'Profesor';
       case 2: return 'Alumno';
@@ -35,55 +37,88 @@ export default function DashboardLayout({ children }) {
     }
   };
 
+  // Genera un avatar con las iniciales
+  const getAvatar = () => {
+    return user?.nombre?.charAt(0).toUpperCase() || '?';
+  };
+
   return (
     <div className="dashboard-layout">
       {/* --- Menú Lateral (Sidebar) --- */}
       <nav className="sidebar">
         
-        {/* 1. Perfil de Usuario (Nombre y Rol) */}
-        <div className="sidebar-profile">
-          <h2 className="profile-name">{user?.nombre}</h2>
-          <p className="profile-role">{getRolText()}</p>
+        {/* 1. Logo/Título Superior */}
+        <div className="sidebar-logo">
+          <BoxFill size={30} className="me-2" />
+          <span>Mi Plataforma</span>
         </div>
 
-        {/* 2. Menú (Aquí pondrás más botones en el futuro) */}
+        {/* 2. Menú de Navegación */}
         <div className="sidebar-menu">
-          <Link 
+          <NavLink 
             to="/dashboard" 
-            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center mb-1"
+            className={({ isActive }) => "sidebar-nav-link" + (isActive ? " active" : "")}
+            end // 'end' asegura que solo esté activo en /dashboard exacto
           >
-            <HouseDoorFill className="me-2" /> Inicio
-          </Link>
-          <Link 
+            <HouseDoorFill size={20} />
+            <span>Inicio</span>
+          </NavLink>
+          
+          <NavLink 
             to="/dashboard/incidentes" 
-            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
+            className={({ isActive }) => "sidebar-nav-link" + (isActive ? " active" : "")}
           >
-            <ExclamationOctagonFill className="me-2" /> Incidentes
-          </Link>
-          <Link 
-              to="/dashboard/encuestas" 
-              className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
+            <ExclamationOctagonFill size={20} />
+            <span>Incidentes</span>
+          </NavLink>
+          
+          <NavLink 
+            to="/dashboard/encuestas" 
+            className={({ isActive }) => "sidebar-nav-link" + (isActive ? " active" : "")}
+          >
+            <ClipboardCheck size={20} />
+            <span>Encuestas</span>
+          </NavLink>
+
+          {/* --- ENLACE SOLO PARA ADMIN --- */}
+          {isAdmin && (
+            <NavLink 
+              to="/dashboard/gestion-usuarios" 
+              className={({ isActive }) => "sidebar-nav-link" + (isActive ? " active" : "")}
             >
-              <ClipboardCheck className="me-2" /> Encuestas
-            </Link>
+              <PeopleFill size={20} />
+              <span>Gestión Usuarios</span>
+            </NavLink>
+          )}
         </div>
 
-        {/* 3. Botón de Cerrar Sesión (al final) */}
-        <div className="sidebar-logout">
-          <Button 
-            variant="danger" 
-            className="btn-logout d-flex align-items-center justify-content-center"
-            onClick={handleLogout}
-          >
-            <BoxArrowRight size={20} className="me-2" />
-            Cerrar Sesión
-          </Button>
+        {/* 3. Footer del Sidebar (Perfil y Logout) */}
+        <div className="sidebar-footer">
+          <div className="sidebar-profile">
+            <div className="profile-avatar">
+              {getAvatar()}
+            </div>
+            <div className="profile-info">
+              <div className="profile-name">{user?.nombre}</div>
+              <div className="profile-email">{user?.correo}</div>
+            </div>
+          </div>
+          
+          <div className="sidebar-logout">
+            <Button 
+              variant="danger" 
+              className="btn-logout"
+              onClick={handleLogout}
+            >
+              <BoxArrowRight size={20} className="me-2" />
+              Cerrar Sesión
+            </Button>
+          </div>
         </div>
       </nav>
 
       {/* --- Contenido Principal --- */}
       <main className="dashboard-content">
-        {/* Aquí se renderiza el componente hijo (AdminDashboard o UserDashboard) */}
         {children} 
       </main>
     </div>

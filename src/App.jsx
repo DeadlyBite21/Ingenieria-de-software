@@ -1,14 +1,15 @@
+// src/App.jsx
 import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login'; // Importamos la página de Login
+import Login from './pages/Login';
 import DashboardRouter from './components/DashboardRouter';
 import ProtectedRoute from './components/ProtectedRoute';
 
-import DashboardLayout from "./components/DashboardLayout"; // Necesario para las rutas
+import DashboardLayout from "./components/DashboardLayout";
 import IncidentsPage from "./pages/IncidentsPage";
 import IncidentCreatePage from "./pages/IncidentCreatePage";
 import IncidentDetailPage from "./pages/IncidentDetailPage";
@@ -17,24 +18,23 @@ import ResetPassword from './pages/ResetPassword';
 import EncuestasListPage from "./pages/EncuestasListPage";
 import CrearEncuestaPage from "./pages/CrearEncuestaPage";
 
-// El componente Home (demo de Vite) sigue igual
+// --- IMPORTAMOS LA NUEVA PÁGINA ---
+import GestionUsuariosPage from "./pages/GestionUsuariosPage";
+
+
 function Home() {
   const { user } = useAuth();
   const [count, setCount] = useState(0);
 
   return (
     <>
-      <div>
-        {/* ... (Tu código de Home existente) ... */}
-      </div>
+      <div>{/* ... */}</div>
       <h1>Vite + React</h1>
-      {/* ... (Tu código de Home existente) ... */}
+      {/* ... */}
     </>
   );
 }
 
-// Componente para rutas públicas
-// Si el usuario ya está logueado, lo redirige al dashboard
 function PublicRoute({ children }) {
     const { user } = useAuth();
     return user ? <Navigate to="/dashboard" /> : children;
@@ -45,47 +45,31 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* RUTA PRINCIPAL: 
-            Redirige automáticamente a /login 
-          */}
+          {/* RUTA PRINCIPAL */}
           <Route path="/" element={<Navigate to="/login" />} />
           
-          {/* RUTA DE LOGIN: 
-            Usa la nueva página de Login y la protege con PublicRoute 
-          */}
+          {/* RUTA DE LOGIN */}
           <Route 
             path="/login" 
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            } 
+            element={<PublicRoute><Login /></PublicRoute>} 
           />
           
-          {/* --- RUTAS DE RECUPERACIÓN AÑADIDAS --- */}
+          {/* RUTAS DE RECUPERACIÓN */}
           <Route 
             path="/recover-password" 
-            element={
-              <PublicRoute>
-                <RecoverPassword />
-              </PublicRoute>
-            } 
+            element={<PublicRoute><RecoverPassword /></PublicRoute>} 
           />
           <Route 
             path="/reset-password" 
-            element={
-              <PublicRoute>
-                <ResetPassword />
-              </PublicRoute>
-            } 
+            element={<PublicRoute><ResetPassword /></PublicRoute>} 
           />
-          {/* --- FIN DE RUTAS AÑADIDAS --- */}
           
-          {/* Dejamos la demo de Home en otra ruta por si la necesitas */}
+          {/* Demo de Home */}
           <Route path="/home-demo" element={<Home />} />
           
-          {/* RUTAS PROTEGIDAS 
-          */}
+          {/* RUTAS PROTEGIDAS */}
+          
+          {/* Dashboard Principal (Router) */}
           <Route 
             path="/dashboard" 
             element={
@@ -94,10 +78,27 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          
+          {/* --- RUTA AÑADIDA PARA GESTIÓN DE USUARIOS (SOLO ADMIN) --- */}
+          <Route 
+            path="/dashboard/gestion-usuarios" 
+            element={
+              // Usamos requiredRole={0} para bloquear a no-admins
+              <ProtectedRoute requiredRole={0}>
+                <DashboardLayout>
+                  <GestionUsuariosPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+          {/* --- FIN DE RUTA AÑADIDA --- */}
+
+          {/* Detalle de Curso (Genérico) */}
           <Route 
             path="/dashboard/courses/:id" 
             element={
               <ProtectedRoute>
+                {/* Este layout simple es temporal, puedes mejorarlo si quieres */}
                 <div style={{ padding: '2rem', textAlign: 'center' }}>
                   <h2>Detalle del Curso</h2>
                   <p>Esta página estará disponible próximamente...</p>
@@ -112,12 +113,14 @@ function App() {
                       cursor: 'pointer'
                     }}
                   >
-                    ← Volver al Dashboard
+                    ← Volver
                   </button>
                 </div>
               </ProtectedRoute>
             } 
           />
+          
+          {/* Incidentes (Lista) */}
           <Route 
             path="/dashboard/incidentes" 
             element={
@@ -129,7 +132,7 @@ function App() {
             } 
           />
           
-          {/* Crear Incidente */}
+          {/* Incidentes (Crear) */}
           <Route 
             path="/dashboard/incidentes/crear" 
             element={
@@ -141,7 +144,7 @@ function App() {
             } 
           />
 
-          {/* Editar Incidente */}
+          {/* Incidentes (Editar) */}
           <Route 
             path="/dashboard/incidentes/editar/:id" 
             element={
@@ -153,7 +156,7 @@ function App() {
             } 
           />
 
-          {/* Detalle de Incidente */}
+          {/* Incidentes (Detalle) */}
           <Route 
             path="/dashboard/incidentes/:id" 
             element={
@@ -165,6 +168,7 @@ function App() {
             } 
           />
 
+          {/* Encuestas (Lista) */}
           <Route 
             path="/dashboard/encuestas" 
             element={
@@ -176,6 +180,7 @@ function App() {
             } 
           />
 
+          {/* Encuestas (Crear) */}
           <Route 
             path="/dashboard/encuestas/crear" 
             element={
