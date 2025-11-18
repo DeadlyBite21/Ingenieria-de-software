@@ -129,8 +129,8 @@ router.get("/usuarios", authenticateToken, isAdmin, async (req, res) => {
 router.post("/usuarios/crear", authenticateToken, isAdmin, async (req, res) => {
   // Usamos 'contrasena' para coincidir con el frontend
   const { rol, rut, nombre, correo, contrasena } = req.body;
-
-  if (![0, 1, 2].includes(rol) || !rut || !nombre || !correo || !contrasena) {
+  //Roles 0: administrador, 1: profesor, 2: alumno, 3: psicologo
+  if (![0, 1, 2, 3].includes(rol) || !rut || !nombre || !correo || !contrasena) {
     return res.status(400).json({ error: "Faltan datos o el rol es inválido" });
   }
 if(contrasena.length < 6) {
@@ -327,6 +327,9 @@ router.post("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin, 
     // Admin (rol 0) no se asigna a cursos
     if (usuario.rol === 0) {
        return res.status(400).json({ error: "Los Administradores no se asignan a cursos" });
+    }
+    if(usuario.rol === 3) {
+        return res.status(400).json({ error: "Los Psicólogos no se asignan a cursos" });
     }
 
     const result = await pool.query(
@@ -798,8 +801,8 @@ router.post('/encuestas', authenticateToken, async (req, res) => {
 router.get('/citas', authenticateToken, async (req, res) => {
   const psicologo_id = req.user.id;
 
-  // Solo profesores/psicólogos pueden ver su agenda
-  if (req.user.rol !== 1 && req.user.rol !== 0) {
+  // Solo psicólogos pueden ver su agenda
+  if (req.user.rol !== 3 && req.user.rol !== 0) {
     return res.status(403).json({ error: 'Acceso denegado. Solo para psicólogos.' });
   }
 
