@@ -17,12 +17,66 @@ export default function IncidentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Additional states for related data if needed
+  const [cursoNombre, setCursoNombre] = useState('');
+  const [alumnosDetalle, setAlumnosDetalle] = useState([]);
+  const [reportadoPor, setReportadoPor] = useState(null);
+
   useEffect(() => {
     apiFetch(`/api/incidentes/${id}`)
       .then(data => setIncidente(data))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+  if (!incidente) return;
+
+  const loadRelated = async () => {
+    try {
+      // aquí usamos SOLO endpoints que sí existen en tu api.js
+      const [cursosData, usuariosData] = await Promise.all([
+        apiFetch('/api/cursos'),
+        apiFetch('/api/usuarios')
+      ]);
+
+      // ---- Curso ----
+      const cursoId = Number(incidente.id_curso);
+      const curso = cursosData.find(c => Number(c.id) === cursoId);
+      setCursoNombre(curso ? curso.nombre : `ID: ${incidente.id_curso}`);
+
+      // ---- Usuario que reportó ----
+      const creadorId =
+        incidente.creado_por !== null && incidente.creado_por !== undefined
+          ? Number(incidente.creado_por)
+          : null;
+
+      const creador = creadorId !== null
+        ? usuariosData.find(u => Number(u.id) === creadorId)
+        : null;
+
+      if (creador) {
+        setReportadoPor(creador);
+      }
+
+      // ---- Alumnos involucrados ----
+      const alumnosIds = Array.isArray(incidente.alumnos) ? incidente.alumnos : [];
+      const alumnosDet = alumnosIds.map(id => {
+        const u = usuariosData.find(user => user.id === id);
+        return {
+          id,
+          nombre: u ? u.nombre : `Usuario ID ${id}`,
+        };
+      });
+      setAlumnosDetalle(alumnosDet);
+      
+    } catch (e) {
+      console.error('Error cargando datos relacionados', e);
+    }
+  };
+
+  loadRelated();
+}, [incidente]);
 
   const getStatusBadge = (estado) => {
     switch (estado) {
@@ -33,10 +87,42 @@ export default function IncidentDetailPage() {
     }
   };
   
-  const renderJSON = (data) => {
-    if (!data || data.length === 0) return <span className="text-muted">No aplica</span>;
-    return <pre className="bg-light p-2 rounded small">{JSON.stringify(data, null, 2)}</pre>;
+  const renderAlumnos = (lista) => {
+    if (!lista || lista.length === 0) {
+      return <span className="text-muted">No aplica</span>;
+    }
+
+    return (
+      <ul className="mb-0 ps-3">
+        {lista.map(a => (
+          <li key={a.id}>
+            {a.nombre} (ID: {a.id})
+          </li>
+        ))}
+      </ul>
+    );
   };
+
+  const renderList = (items) => {
+    if (!items || items.length === 0) {
+      return <span className="text-muted">No aplica</span>;
+    }
+
+    if (!Array.isArray(items)) {
+      return <span>{String(items)}</span>;
+    }
+
+    return (
+      <ul className="mb-0 ps-3">
+        {items.map((item, idx) => (
+          <li key={idx}>
+            {typeof item === 'object' ? JSON.stringify(item) : String(item)}
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
 
   if (loading) {
     return <div className="text-center my-5"><Spinner animation="border" /></div>;
@@ -81,8 +167,8 @@ export default function IncidentDetailPage() {
               {new Date(incidente.fecha).toLocaleString()}
             </div>
             <div className="col-md-6">
-              <strong>Curso ID:</strong><br />
-              {incidente.id_curso}
+              <strong>Curso:</strong><br />
+              {cursoNombre || `ID: ${incidente.id_curso}`}
             </div>
             <div className="col-md-6">
               <strong>Lugar:</strong><br />
@@ -96,22 +182,27 @@ export default function IncidentDetailPage() {
         </Card.Body>
         <ListGroup variant="flush">
           <ListGroup.Item>
-            <strong>Alumnos Involucrados (IDs):</strong>
-            {renderJSON(incidente.alumnos)}
+            <strong>Alumnos Involucrados:</strong>
+            <div>{renderAlumnos(alumnosDetalle)}</div>
           </ListGroup.Item>
           <ListGroup.Item>
             <strong>Otros Participantes:</strong>
-            {renderJSON(incidente.participantes)}
+            {renderList(incidente.participantes)}
           </ListGroup.Item>
           <ListGroup.Item>
             <strong>Medidas Tomadas:</strong>
-            {renderJSON(incidente.medidas)}
+            {renderList(incidente.medidas)}
           </ListGroup.Item>
           <ListGroup.Item>
-            <strong>Reportado por (Usuario ID):</strong>
-            <p className="mb-0">{incidente.creado_por || 'Sistema'}</p>
+            <strong>Reportado por:</strong>
+            <p className="mb-0">
+              {reportadoPor
+                ? `${reportadoPor.nombre} (ID: ${reportadoPor.id})`
+                : (incidente.creado_por || 'Sistema')}
+            </p>
           </ListGroup.Item>
         </ListGroup>
+
       </Card>
     </div>
   );
