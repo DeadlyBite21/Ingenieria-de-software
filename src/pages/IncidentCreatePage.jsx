@@ -4,6 +4,10 @@ import { apiFetch } from '../utils/api';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+// Date picker
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+
 // --- Importaciones de React Bootstrap ---
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
@@ -23,15 +27,56 @@ export default function IncidentCreatePage() {
     severidad: 'baja',
     descripcion: '',
     lugar: '',
-    // Campos JSON simplificados
-    alumnos: '', // El usuario pondrá IDs separados por coma
-    // 'participantes', 'medidas', 'adjuntos' los omitimos por simplicidad
+    alumnos: [],      // alumnos en array
+    fechaHora: null     // nueva fecha y hora del incidente manualmente
   });
+
+  const [cursos, setCursos] = useState([]);
+  const [alumnosDisponibles, setAlumnosDisponibles] = useState([]);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
   const isEditing = Boolean(id);
+
+  // Cargar cursos y alumnos disponibles para el formulario
+  // Cargar solo cursos para el formulario
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const cursosData = await apiFetch('/api/cursos');
+        setCursos(cursosData);
+      } catch (err) {
+        console.error('Error cargando cursos', err);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Cargar usuarios (profes y alumnos) según el curso seleccionado
+  useEffect(() => {
+    const loadUsuariosCurso = async () => {
+      // Si no hay curso seleccionado, limpiamos la lista
+      if (!formData.idCurso) {
+        setAlumnosDisponibles([]);
+        return;
+      }
+
+      try {
+        const usuariosData = await apiFetch(`/api/cursos/${formData.idCurso}/usuarios`);
+        // Solo profesor (1) y alumno (2)
+        const alumnosYProfes = usuariosData.filter(u => u.rol === 1 || u.rol === 2);
+        setAlumnosDisponibles(alumnosYProfes);
+      } catch (err) {
+        console.error('Error cargando usuarios del curso', err);
+        setAlumnosDisponibles([]);
+      }
+    };
+
+    loadUsuariosCurso();
+  }, [formData.idCurso]);
+
 
   // Si estamos editando, cargar los datos del incidente
   useEffect(() => {
@@ -39,23 +84,35 @@ export default function IncidentCreatePage() {
       setLoading(true);
       apiFetch(`/api/incidentes/${id}`)
         .then(data => {
-          setFormData({
-            idCurso: data.id_curso || '',
-            tipo: data.tipo || 'académico',
-            severidad: data.severidad || 'baja',
-            descripcion: data.descripcion || '',
-            lugar: data.lugar || '',
-            alumnos: (data.alumnos || []).join(', '), // Convertir array a string
-          });
+          const fechaISO = data.fecha || null;
+          const fechaDate = fechaISO ? new Date(fechaISO) : null;
+
+          setFormData(prev => ({
+            ...prev,
+            idCurso: data.id_curso ?? '',
+            tipo: data.tipo ?? 'académico',
+            severidad: data.severidad ?? 'baja',
+            descripcion: data.descripcion ?? '',
+            lugar: data.lugar ?? '',
+            alumnos: data.alumnos || [],
+            fechaHora: fechaDate      // Date o null
+          }));
         })
         .catch(err => setError(err.message))
         .finally(() => setLoading(false));
     }
   }, [id, isEditing]);
 
+
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, multiple, selectedOptions } = e.target;
+
+    if (multiple) {
+      const values = Array.from(selectedOptions).map(opt => opt.value);
+      setFormData(prev => ({ ...prev, [name]: values }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -70,11 +127,15 @@ export default function IncidentCreatePage() {
       severidad: formData.severidad,
       descripcion: formData.descripcion,
       lugar: formData.lugar || null,
-      // Convertir string de IDs a array de números
-      alumnos: formData.alumnos.split(',')
-                  .map(id => parseInt(id.trim()))
-                  .filter(id => !isNaN(id) && id > 0)
+      alumnos: (formData.alumnos || [])
+        .map(id => parseInt(id))
+        .filter(id => !isNaN(id) && id > 0),
+      // el backend espera "fecha"
+      fecha: formData.fechaHora
+        ? new Date(formData.fechaHora).toISOString()
+        : null
     };
+
     
     // Validar descripción
     if (payload.descripcion.length < 10) {
@@ -130,16 +191,22 @@ export default function IncidentCreatePage() {
             <div className="row g-3">
               {/* ID Curso */}
               <div className="col-md-4">
-                <Form.Group controlId="idCurso">
-                  <Form.Label>ID del Curso*</Form.Label>
-                  <Form.Control 
-                    type="number" 
-                    name="idCurso"
+                <Form.Group controlId="idCursoSelect" className="mt-2">
+                  <Form.Label>Seleccionar curso</Form.Label>
+                  <Form.Select
                     value={formData.idCurso}
-                    onChange={handleChange}
-                    required
-                    disabled={loading}
-                  />
+                    onChange={(e) =>
+                      setFormData(prev => ({ ...prev, idCurso: e.target.value }))
+                    }
+                    disabled={loading || cursos.length === 0}
+                  >
+                    <option value="">Selecciona un curso...</option>
+                    {cursos.map(curso => (
+                      <option key={curso.id} value={curso.id}>
+                        {curso.nombre} (ID: {curso.id})
+                      </option>
+                    ))}
+                  </Form.Select>
                 </Form.Group>
               </div>
               
@@ -181,6 +248,25 @@ export default function IncidentCreatePage() {
                 </Form.Group>
               </div>
 
+              <div className="col-md-4">
+                <Form.Group controlId="fechaHora">
+                  <Form.Label>Fecha y hora del incidente*</Form.Label>
+                  <DatePicker
+                    selected={formData.fechaHora}
+                    onChange={(date) =>
+                      setFormData(prev => ({ ...prev, fechaHora: date }))
+                    }
+                    showTimeSelect
+                    timeIntervals={15}              // cada 15 minutos
+                    dateFormat="dd/MM/yyyy HH:mm"
+                    placeholderText="Selecciona fecha y hora"
+                    className="form-control"        // para que se vea como un input de Bootstrap
+                    disabled={loading}
+                  />
+                </Form.Group>
+              </div>
+
+
               {/* Lugar */}
               <div className="col-md-12">
                 <Form.Group controlId="lugar">
@@ -216,17 +302,26 @@ export default function IncidentCreatePage() {
               {/* Alumnos */}
               <div className="col-md-12">
                 <Form.Group controlId="alumnos">
-                  <Form.Label>IDs de Alumnos Involucrados (Opcional)</Form.Label>
-                  <Form.Control 
-                    type="text" 
+                  <Form.Label>Alumnos involucrados (Opcional)</Form.Label>
+                  <Form.Select
                     name="alumnos"
-                    placeholder="IDs separados por coma. Ej: 1, 5, 12"
+                    multiple
                     value={formData.alumnos}
                     onChange={handleChange}
-                    disabled={loading}
-                  />
+                    disabled={loading || alumnosDisponibles.length === 0}
+                  >
+                    {alumnosDisponibles.map(usuario => (
+                      <option key={usuario.id} value={usuario.id}>
+                        {usuario.nombre} (ID: {usuario.id}, {usuario.rol === 1 ? 'Profesor' : 'Alumno'})
+                      </option>
+                    ))}
+                  </Form.Select>
+                  <Form.Text className="text-muted">
+                    Usa Ctrl (o Cmd en Mac) para seleccionar varios alumnos.
+                  </Form.Text>
                 </Form.Group>
               </div>
+
             </div>
 
             {error && <Alert variant="danger" className="mt-4">{error}</Alert>}
