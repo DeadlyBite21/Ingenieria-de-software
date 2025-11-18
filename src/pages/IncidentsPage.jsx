@@ -17,6 +17,7 @@ import { EyeFill, PencilSquare, PlusCircleFill } from 'react-bootstrap-icons';
 export default function IncidentsPage() {
   const { user, isAdmin, isProfesor } = useAuth();
   const [incidentes, setIncidentes] = useState([]);
+  const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -60,6 +61,22 @@ export default function IncidentsPage() {
       setLoading(false);
     }
   }, [pagination.page, pagination.limit, filters]); // Dependencias para recargar
+
+  // Cargar lista de cursos para filtro
+  useEffect(() => {
+  const loadCursos = async () => {
+    try {
+      // OJO: ajusta esta ruta al endpoint real de tu backend
+      const data = await apiFetch('/api/cursos');
+      setCursos(data); // asumiendo que viene como array [{ id, nombre, ... }]
+    } catch (err) {
+      console.error('Error al cargar cursos', err);
+    }
+  };
+
+  loadCursos();
+  }, []);
+
 
   // --- 2. useEffect para cargar datos al montar o al cambiar página ---
   useEffect(() => {
@@ -127,16 +144,22 @@ export default function IncidentsPage() {
             <div className="row g-3">
               <div className="col-md-4">
                 <Form.Group controlId="filterCurso">
-                  <Form.Label>ID de Curso</Form.Label>
-                  <Form.Control 
-                    type="text" 
+                  <Form.Label>Curso</Form.Label>
+                  <Form.Select
                     name="idCurso"
                     value={filters.idCurso}
                     onChange={handleFilterChange}
-                    placeholder="Ej: 1"
-                    disabled={loading}
-                  />
+                    disabled={loading || cursos.length === 0}
+                  >
+                    <option value="">Todos</option>
+                    {cursos.map(curso => (
+                      <option key={curso.id} value={curso.id}>
+                        {curso.nombre} (ID: {curso.id})
+                      </option>
+                    ))}
+                  </Form.Select>
                 </Form.Group>
+
               </div>
               <div className="col-md-4">
                 <Form.Group controlId="filterEstado">
