@@ -826,7 +826,7 @@ router.get('/citas', authenticateToken, async (req, res) => {
 });
 
 // Crear una nueva cita (buscando paciente por nombre)
-app.post('/api/citas/crear', authenticateToken, async (req, res) => {
+router.post('/citas/crear', authenticateToken, async (req, res) => {
   const psicologo_id = req.user.id;
   
   // 1. Recibimos 'nombre_paciente' en lugar de 'paciente_id'
