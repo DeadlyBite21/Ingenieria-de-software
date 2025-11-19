@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import Button from 'react-bootstrap/Button';
+import { CalendarEvent } from 'react-bootstrap-icons';
 import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill, ClipboardCheck } from 'react-bootstrap-icons';
 import './DashboardLayout.css'; // Importamos los nuevos estilos
 
@@ -66,6 +67,12 @@ export default function DashboardLayout({ children }) {
             >
               <ClipboardCheck className="me-2" /> Encuestas
             </Link>
+          <Link 
+            to="/dashboard/citas" 
+            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
+          >
+            <CalendarEvent className="me-2" /> Citas
+          </Link>
         </div>
 
         {/* 3. Botón de Cerrar Sesión (al final) */}

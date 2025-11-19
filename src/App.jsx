@@ -16,6 +16,9 @@ import RecoverPassword from './pages/RecoverPassword';
 import ResetPassword from './pages/ResetPassword';
 import EncuestasListPage from "./pages/EncuestasListPage";
 import CrearEncuestaPage from "./pages/CrearEncuestaPage";
+import CitasListPage from "./pages/CitasListPage";
+import CitasCreatePage from "./pages/CitasCreatePage";
+import CitasDetailPage from "./pages/CitasDetailPage";
 
 // El componente Home (demo de Vite) sigue igual
 function Home() {
@@ -183,6 +186,30 @@ function App() {
                 <DashboardLayout>
                   <CrearEncuestaPage />
                 </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard/citas" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout><CitasListPage /></DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard/citas/crear" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout><CitasCreatePage /></DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard/citas/:id" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout><CitasDetailPage /></DashboardLayout>
               </ProtectedRoute>
             } 
           />
