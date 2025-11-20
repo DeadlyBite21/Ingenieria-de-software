@@ -797,13 +797,36 @@ router.post('/encuestas', authenticateToken, async (req, res) => {
 });
 // ================== GESTIÓN DE AGENDA (CITAS) ==================
 
-// Obtener citas del psicólogo (profesor) logueado
+// Obtener lista de psicólogos (Para que el alumno elija)
+router.get('/psicologos', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, nombre, correo FROM usuarios WHERE rol = 3 ORDER BY nombre"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener psicólogos" });
+  }
+});
+// Obtener citas (Modificado para soportar vista de alumno)
 router.get('/citas', authenticateToken, async (req, res) => {
-  const psicologo_id = req.user.id;
+  let psicologo_id;
 
-  // Solo psicólogos pueden ver su agenda
-  if (req.user.rol !== 3 && req.user.rol !== 0) {
-    return res.status(403).json({ error: 'Acceso denegado. Solo para psicólogos.' });
+  // Si es Alumno (2), debe indicar qué agenda quiere ver
+  if (req.user.rol === 2) {
+    if (!req.query.psicologo_id) {
+      return res.status(400).json({ error: 'Debe especificar un psicologo_id' });
+    }
+    psicologo_id = req.query.psicologo_id;
+  } else if (req.user.rol === 3) {
+    // Si es Psicólogo (3), ve su propia agenda
+    psicologo_id = req.user.id;
+  } else if (req.user.rol === 0) {
+     // Si es Admin (0), podría ver cualquiera, aquí asumimos que pasa el ID o ve el suyo
+     psicologo_id = req.query.psicologo_id || req.user.id;
+  } else {
+    return res.status(403).json({ error: 'Acceso denegado.' });
   }
 
   try {
@@ -828,58 +851,54 @@ router.get('/citas', authenticateToken, async (req, res) => {
   }
 });
 
-// Crear una nueva cita (buscando paciente por nombre)
+// Crear cita (Modificado para Psicólogos y Alumnos)
 router.post('/citas/crear', authenticateToken, async (req, res) => {
-  const psicologo_id = req.user.id;
-  
-  // 1. Recibimos 'nombre_paciente' en lugar de 'paciente_id'
-  const { nombre_paciente, titulo, start, end, notas } = req.body;
+  const { titulo, start, end, notas } = req.body;
+  let psicologo_id;
+  let paciente_id;
 
-  if (req.user.rol !== 1) {
-    return res.status(403).json({ error: 'Solo los psicólogos (rol 1) pueden crear citas.' });
+  // Lógica para Psicólogo (Rol 3): Agenda a un paciente por nombre
+  if (req.user.rol === 3) {
+    psicologo_id = req.user.id;
+    const { nombre_paciente } = req.body;
+    if (!nombre_paciente) return res.status(400).json({ error: 'Falta nombre_paciente' });
+
+    // Buscar ID del paciente
+    const pacienteResult = await pool.query(
+      "SELECT id FROM usuarios WHERE nombre ILIKE $1 AND rol = 2", 
+      [nombre_paciente]
+    );
+    if (pacienteResult.rows.length === 0) return res.status(404).json({ error: 'Paciente no encontrado' });
+    paciente_id = pacienteResult.rows[0].id;
+  } 
+  // Lógica para Alumno (Rol 2): Se agenda a sí mismo con un psicólogo
+  else if (req.user.rol === 2) {
+    paciente_id = req.user.id; // El paciente es el usuario logueado
+    if (!req.body.psicologo_id) return res.status(400).json({ error: 'Falta seleccionar psicólogo' });
+    psicologo_id = req.body.psicologo_id;
+  } 
+  else {
+    return res.status(403).json({ error: 'Permiso denegado' });
   }
 
-  // 2. Validamos los nuevos datos
-  if (!nombre_paciente || !titulo || !start || !end) {
-    return res.status(400).json({ error: 'Faltan datos (nombre_paciente, titulo, start, end)' });
+  if (!titulo || !start || !end) {
+    return res.status(400).json({ error: 'Faltan datos de la cita' });
   }
 
   try {
-    // 3. Buscamos al paciente por nombre Y rol
-    const pacienteResult = await pool.query(
-      "SELECT id FROM usuarios WHERE nombre ILIKE $1 AND rol = 2",
-      [nombre_paciente] // ILIKE ignora mayúsculas/minúsculas
-    );
-
-    // 4. Manejamos si no se encuentra o hay duplicados
-    if (pacienteResult.rows.length === 0) {
-      return res.status(404).json({ error: `Paciente (rol 2) con nombre "${nombre_paciente}" no encontrado.` });
-    }
-    
-    if (pacienteResult.rows.length > 1) {
-      return res.status(400).json({ error: `Múltiples pacientes (rol 2) encontrados con el nombre "${nombre_paciente}". Por favor, sea más específico.` });
-    }
-
-    // 5. Obtenemos el ID del paciente encontrado
-    const paciente_id = pacienteResult.rows[0].id;
-
-    // 6. Insertamos la cita con el ID del paciente
     const result = await pool.query(
       `INSERT INTO citas (psicologo_id, paciente_id, titulo, fecha_hora_inicio, fecha_hora_fin, notas) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *, fecha_hora_inicio AS "start", fecha_hora_fin AS "end"`,
-      [psicologo_id, paciente_id, titulo, start, end, notas]
+      [psicologo_id, paciente_id, titulo, start, end, notas || '']
     );
-    
-    res.status(201).json({ message: "Cita creada con éxito 🚀", cita: result.rows[0] });
-
+    res.status(201).json({ message: "Cita agendada con éxito 🚀", cita: result.rows[0] });
   } catch (err) {
-    // Manejo de conflicto de horario (si las horas se superponen)
     if (err.code === '23P01' || err.code === '40P01') { 
         return res.status(409).json({ error: "El horario seleccionado ya está ocupado." });
     }
-    console.error('Error al crear cita:', err);
-    res.status(500).json({ error: 'Error interno al crear la cita' });
+    console.error(err);
+    res.status(500).json({ error: 'Error al crear la cita' });
   }
 });
 
