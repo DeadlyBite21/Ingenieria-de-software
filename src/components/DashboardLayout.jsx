@@ -2,14 +2,14 @@ import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import Button from 'react-bootstrap/Button';
-import { CalendarEvent } from 'react-bootstrap-icons';
-import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill, ClipboardCheck } from 'react-bootstrap-icons';
-import './DashboardLayout.css'; // Importamos los nuevos estilos
+// Añadimos PeopleFill a la importación
+import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill, ClipboardCheck, CalendarEvent, PeopleFill } from 'react-bootstrap-icons';
+import './DashboardLayout.css';
 
 // Este componente "envolverá" a tus dashboards (Admin y User)
 export default function DashboardLayout({ children }) {
   // Obtenemos el usuario y la función logout del contexto
-  const { user, logout, isAdmin, isProfesor } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   // Hook para añadir la clase al body y poner el fondo claro
@@ -40,35 +40,46 @@ export default function DashboardLayout({ children }) {
     <div className="dashboard-layout">
       {/* --- Menú Lateral (Sidebar) --- */}
       <nav className="sidebar">
-        
+
         {/* 1. Perfil de Usuario (Nombre y Rol) */}
         <div className="sidebar-profile">
           <h2 className="profile-name">{user?.nombre}</h2>
           <p className="profile-role">{getRolText()}</p>
         </div>
 
-        {/* 2. Menú (Aquí pondrás más botones en el futuro) */}
+        {/* 2. Menú */}
         <div className="sidebar-menu">
-          <Link 
-            to="/dashboard" 
+          <Link
+            to="/dashboard"
             className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center mb-1"
           >
             <HouseDoorFill className="me-2" /> Inicio
           </Link>
-          <Link 
-            to="/dashboard/incidentes" 
+
+          {/* --- BOTÓN DE USUARIOS (Solo visible para Admin) --- */}
+          {user?.rol === 0 && (
+            <Link
+              to="/dashboard/usuarios"
+              className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center mb-1"
+            >
+              <PeopleFill className="me-2" /> Usuarios
+            </Link>
+          )}
+
+          <Link
+            to="/dashboard/incidentes"
             className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
           >
             <ExclamationOctagonFill className="me-2" /> Incidentes
           </Link>
-          <Link 
-              to="/dashboard/encuestas" 
-              className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
-            >
-              <ClipboardCheck className="me-2" /> Encuestas
-            </Link>
-          <Link 
-            to="/dashboard/citas" 
+          <Link
+            to="/dashboard/encuestas"
+            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
+          >
+            <ClipboardCheck className="me-2" /> Encuestas
+          </Link>
+          <Link
+            to="/dashboard/citas"
             className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
           >
             <CalendarEvent className="me-2" /> Citas
@@ -77,8 +88,8 @@ export default function DashboardLayout({ children }) {
 
         {/* 3. Botón de Cerrar Sesión (al final) */}
         <div className="sidebar-logout">
-          <Button 
-            variant="danger" 
+          <Button
+            variant="danger"
             className="btn-logout d-flex align-items-center justify-content-center"
             onClick={handleLogout}
           >
@@ -90,8 +101,7 @@ export default function DashboardLayout({ children }) {
 
       {/* --- Contenido Principal --- */}
       <main className="dashboard-content">
-        {/* Aquí se renderiza el componente hijo (AdminDashboard o UserDashboard) */}
-        {children} 
+        {children}
       </main>
     </div>
   );

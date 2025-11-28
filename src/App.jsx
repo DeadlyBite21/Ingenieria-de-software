@@ -19,6 +19,7 @@ import CrearEncuestaPage from "./pages/CrearEncuestaPage";
 import CitasListPage from "./pages/CitasListPage";
 import CitasCreatePage from "./pages/CitasCreatePage";
 import CitasDetailPage from "./pages/CitasDetailPage";
+import UserManagementPage from "./pages/UserManagementPage"; // <--- NUEVA IMPORTACIÓN
 
 // El componente Home (demo de Vite) sigue igual
 function Home() {
@@ -28,10 +29,25 @@ function Home() {
   return (
     <>
       <div>
-        {/* ... (Tu código de Home existente) ... */}
+        <a href="https://vite.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
       </div>
       <h1>Vite + React</h1>
-      {/* ... (Tu código de Home existente) ... */}
+      <div className="card">
+        <button onClick={() => setCount((count) => count + 1)}>
+          count is {count}
+        </button>
+        <p>
+          Edit <code>src/App.jsx</code> and save to test HMR
+        </p>
+      </div>
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
     </>
   );
 }
@@ -39,8 +55,8 @@ function Home() {
 // Componente para rutas públicas
 // Si el usuario ya está logueado, lo redirige al dashboard
 function PublicRoute({ children }) {
-    const { user } = useAuth();
-    return user ? <Navigate to="/dashboard" /> : children;
+  const { user } = useAuth();
+  return user ? <Navigate to="/dashboard" /> : children;
 }
 
 function App() {
@@ -52,59 +68,70 @@ function App() {
             Redirige automáticamente a /login 
           */}
           <Route path="/" element={<Navigate to="/login" />} />
-          
+
           {/* RUTA DE LOGIN: 
             Usa la nueva página de Login y la protege con PublicRoute 
           */}
-          <Route 
-            path="/login" 
+          <Route
+            path="/login"
             element={
               <PublicRoute>
                 <Login />
               </PublicRoute>
-            } 
+            }
           />
-          
+
           {/* --- RUTAS DE RECUPERACIÓN AÑADIDAS --- */}
-          <Route 
-            path="/recover-password" 
+          <Route
+            path="/recover-password"
             element={
               <PublicRoute>
                 <RecoverPassword />
               </PublicRoute>
-            } 
+            }
           />
-          <Route 
-            path="/reset-password" 
+          <Route
+            path="/reset-password"
             element={
               <PublicRoute>
                 <ResetPassword />
               </PublicRoute>
-            } 
+            }
           />
-          {/* --- FIN DE RUTAS AÑADIDAS --- */}
-          
+
           {/* Dejamos la demo de Home en otra ruta por si la necesitas */}
           <Route path="/home-demo" element={<Home />} />
-          
-          {/* RUTAS PROTEGIDAS 
-          */}
-          <Route 
-            path="/dashboard" 
+
+          {/* RUTAS PROTEGIDAS */}
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <DashboardRouter />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dashboard/courses/:id" 
+
+          {/* --- NUEVA RUTA: GESTIÓN DE USUARIOS (Solo Admin) --- */}
+          <Route
+            path="/dashboard/usuarios"
+            element={
+              <ProtectedRoute requiredRole={0}>
+                <DashboardLayout>
+                  <UserManagementPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/courses/:id"
             element={
               <ProtectedRoute>
                 <div style={{ padding: '2rem', textAlign: 'center' }}>
                   <h2>Detalle del Curso</h2>
                   <p>Esta página estará disponible próximamente...</p>
-                  <button 
+                  <button
                     onClick={() => window.history.back()}
                     style={{
                       padding: '8px 16px',
@@ -119,99 +146,99 @@ function App() {
                   </button>
                 </div>
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dashboard/incidentes" 
+          <Route
+            path="/dashboard/incidentes"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <IncidentsPage />
                 </DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
-          
+
           {/* Crear Incidente */}
-          <Route 
-            path="/dashboard/incidentes/crear" 
+          <Route
+            path="/dashboard/incidentes/crear"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <IncidentCreatePage />
                 </DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* Editar Incidente */}
-          <Route 
-            path="/dashboard/incidentes/editar/:id" 
+          <Route
+            path="/dashboard/incidentes/editar/:id"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <IncidentCreatePage />
                 </DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* Detalle de Incidente */}
-          <Route 
-            path="/dashboard/incidentes/:id" 
+          <Route
+            path="/dashboard/incidentes/:id"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <IncidentDetailPage />
                 </DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/dashboard/encuestas" 
+          <Route
+            path="/dashboard/encuestas"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <EncuestasListPage />
                 </DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/dashboard/encuestas/crear" 
+          <Route
+            path="/dashboard/encuestas/crear"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <CrearEncuestaPage />
                 </DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dashboard/citas" 
+          <Route
+            path="/dashboard/citas"
             element={
               <ProtectedRoute>
                 <DashboardLayout><CitasListPage /></DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dashboard/citas/crear" 
+          <Route
+            path="/dashboard/citas/crear"
             element={
               <ProtectedRoute>
                 <DashboardLayout><CitasCreatePage /></DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dashboard/citas/:id" 
+          <Route
+            path="/dashboard/citas/:id"
             element={
               <ProtectedRoute>
                 <DashboardLayout><CitasDetailPage /></DashboardLayout>
               </ProtectedRoute>
-            } 
+            }
           />
         </Routes>
       </Router>
