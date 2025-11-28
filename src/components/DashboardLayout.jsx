@@ -1,21 +1,25 @@
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
-import Button from 'react-bootstrap/Button';
-// Añadimos PeopleFill a la importación
-import { BoxArrowRight, HouseDoorFill, ExclamationOctagonFill, ClipboardCheck, CalendarEvent, PeopleFill } from 'react-bootstrap-icons';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import {
+  BoxArrowRight,
+  HouseDoor,
+  ExclamationOctagon,
+  ClipboardCheck,
+  CalendarEvent,
+  People,
+  Grid1x2Fill,
+  PersonCircle
+} from 'react-bootstrap-icons';
 import './DashboardLayout.css';
 
-// Este componente "envolverá" a tus dashboards (Admin y User)
 export default function DashboardLayout({ children }) {
-  // Obtenemos el usuario y la función logout del contexto
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Hook para añadir la clase al body y poner el fondo claro
   useEffect(() => {
     document.body.classList.add('dashboard-active');
-    // Función de limpieza para cuando salgamos del dashboard
     return () => {
       document.body.classList.remove('dashboard-active');
     };
@@ -23,10 +27,9 @@ export default function DashboardLayout({ children }) {
 
   const handleLogout = () => {
     logout();
-    navigate('/login'); // Redirigimos al login
+    navigate('/login');
   };
 
-  // Función para obtener el texto del rol
   const getRolText = () => {
     switch (user?.rol) {
       case 0: return 'Administrador';
@@ -36,70 +39,77 @@ export default function DashboardLayout({ children }) {
     }
   };
 
+  const isActive = (path) => location.pathname === path ? 'active' : '';
+
   return (
     <div className="dashboard-layout">
-      {/* --- Menú Lateral (Sidebar) --- */}
       <nav className="sidebar">
 
-        {/* 1. Perfil de Usuario (Nombre y Rol) */}
-        <div className="sidebar-profile">
-          <h2 className="profile-name">{user?.nombre}</h2>
-          <p className="profile-role">{getRolText()}</p>
+        {/* 1. Header / Logo Cambiado */}
+        <div className="sidebar-header">
+          <Grid1x2Fill className="app-logo" />
+          <span className="app-name">Convivio</span>
         </div>
 
-        {/* 2. Menú */}
+        {/* (Buscador eliminado aquí) */}
+
+        {/* 2. Menú de Navegación */}
         <div className="sidebar-menu">
-          <Link
-            to="/dashboard"
-            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center mb-1"
-          >
-            <HouseDoorFill className="me-2" /> Inicio
+
+          <Link to="/dashboard" className={`sidebar-link ${isActive('/dashboard')}`}>
+            <HouseDoor className="link-icon" />
+            <span>Inicio</span>
           </Link>
 
-          {/* --- BOTÓN DE USUARIOS (Solo visible para Admin) --- */}
+          {/* Gestión (Solo Admin) */}
           {user?.rol === 0 && (
-            <Link
-              to="/dashboard/usuarios"
-              className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center mb-1"
-            >
-              <PeopleFill className="me-2" /> Usuarios
-            </Link>
+            <>
+              <div className="menu-label">Administración</div>
+              <Link to="/dashboard/usuarios" className={`sidebar-link ${isActive('/dashboard/usuarios')}`}>
+                <People className="link-icon" />
+                <span>Usuarios</span>
+              </Link>
+            </>
           )}
 
-          <Link
-            to="/dashboard/incidentes"
-            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
-          >
-            <ExclamationOctagonFill className="me-2" /> Incidentes
+          <div className="menu-label">Aplicaciones</div>
+
+          <Link to="/dashboard/incidentes" className={`sidebar-link ${isActive('/dashboard/incidentes')}`}>
+            <ExclamationOctagon className="link-icon" />
+            <span>Incidentes</span>
           </Link>
-          <Link
-            to="/dashboard/encuestas"
-            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
-          >
-            <ClipboardCheck className="me-2" /> Encuestas
+
+          <Link to="/dashboard/encuestas" className={`sidebar-link ${isActive('/dashboard/encuestas')}`}>
+            <ClipboardCheck className="link-icon" />
+            <span>Encuestas</span>
           </Link>
-          <Link
-            to="/dashboard/citas"
-            className="btn btn-link text-start text-white text-decoration-none d-flex align-items-center"
-          >
-            <CalendarEvent className="me-2" /> Citas
+
+          <Link to="/dashboard/citas" className={`sidebar-link ${isActive('/dashboard/citas')}`}>
+            <CalendarEvent className="link-icon" />
+            <span>Citas</span>
           </Link>
         </div>
 
-        {/* 3. Botón de Cerrar Sesión (al final) */}
-        <div className="sidebar-logout">
-          <Button
-            variant="danger"
-            className="btn-logout d-flex align-items-center justify-content-center"
+        {/* 3. Tarjeta de Usuario */}
+        <div className="user-profile-card">
+          <div className="user-avatar">
+            {user?.nombre?.charAt(0).toUpperCase() || <PersonCircle />}
+          </div>
+          <div className="user-info">
+            <p className="user-name">{user?.nombre}</p>
+            <p className="user-role">{getRolText()}</p>
+          </div>
+          <div
+            className="logout-btn-icon"
             onClick={handleLogout}
+            title="Cerrar Sesión"
           >
-            <BoxArrowRight size={20} className="me-2" />
-            Cerrar Sesión
-          </Button>
+            <BoxArrowRight size={20} />
+          </div>
         </div>
+
       </nav>
 
-      {/* --- Contenido Principal --- */}
       <main className="dashboard-content">
         {children}
       </main>

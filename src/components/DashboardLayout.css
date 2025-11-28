@@ -1,72 +1,213 @@
 /* src/components/DashboardLayout.css */
 
-/*
-  Añade un fondo claro a la sección del dashboard
-  para anular el fondo oscuro por defecto de src/index.css
-*/
+/* Variables para el tema oscuro */
+:root {
+  --sidebar-bg: #0f0f10;
+  /* Fondo casi negro */
+  --sidebar-width: 280px;
+  --text-muted: #8a8a8e;
+  /* Gris texto */
+  --text-light: #ffffff;
+  --accent-color: var(--color-primary);
+  /* Morado base */
+  --accent-gradient: linear-gradient(90deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  /* Gradiente morado */
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --card-bg: #1c1c1e;
+  /* Fondo de tarjetas internas */
+}
+
 body.dashboard-active {
-  background-color: #f8f9fa; /* Un gris claro */
-  color: #212529; /* Color de texto oscuro por defecto */
+  background-color: #f3f4f6;
+  /* Fondo claro para el contenido principal */
+  color: #1f2937;
+  margin: 0;
 }
 
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* --- Estilos del Menú Lateral (Sidebar) --- */
+/* --- Sidebar Container --- */
 .sidebar {
-  width: 260px; /* Ancho del menú */
-  background-color: #212529; /* Fondo oscuro (puedes cambiarlo) */
-  color: #ffffff; /* Texto blanco */
-  position: fixed; /* Fijo en la pantalla */
+  width: var(--sidebar-width);
+  background-color: var(--sidebar-bg);
+  color: var(--text-muted);
+  position: fixed;
   top: 0;
   left: 0;
   height: 100vh;
-  padding: 1.5rem 1rem;
-  
-  /* Usamos flexbox para alinear el botón de logout abajo */
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
+  border-right: 1px solid #27272a;
+  z-index: 1000;
 }
 
-.sidebar-profile {
-  text-align: center;
+/* --- Header / Logo --- */
+.sidebar-header {
   margin-bottom: 2rem;
-  border-bottom: 1px solid #495057; /* Separador sutil */
-  padding-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-light);
 }
 
-.sidebar-profile .profile-name {
-  font-size: 1.2rem;
+.app-logo {
+  font-size: 1.5rem;
+  color: var(--text-light);
+  /* Icono blanco */
+}
+
+.app-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+/* --- Buscador Falso (Visual) --- */
+.sidebar-search {
+  background-color: var(--card-bg);
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.sidebar-search svg {
+  opacity: 0.6;
+}
+
+/* --- Menú de Navegación --- */
+.sidebar-menu {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+.menu-label {
+  font-size: 0.75rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 0.75rem;
+  opacity: 0.6;
+}
+
+/* --- Enlaces (Botones) --- */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  /* Bordes muy redondeados */
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.sidebar-link:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-light);
+}
+
+/* Estado Activo (El estilo morado brillante) */
+.sidebar-link.active {
+  background: var(--accent-gradient);
+  color: white;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+  /* Resplandor morado */
+}
+
+.link-icon {
+  font-size: 1.1rem;
+}
+
+/* --- Perfil de Usuario (Abajo) --- */
+.user-profile-card {
+  margin-top: auto;
+  /* Empuja hacia abajo */
+  background-color: var(--card-bg);
+  border-radius: 16px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid #333;
+  transition: border-color 0.2s;
+}
+
+.user-profile-card:hover {
+  border-color: #555;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background-color: #3f3f46;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+}
+
+.user-info {
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.user-name {
+  color: var(--text-light);
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin: 0;
 }
 
-.sidebar-profile .profile-role {
-  font-size: 0.9rem;
-  color: #adb5bd; /* Texto de rol en gris claro */
+.user-role {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: 0;
 }
 
-/* Este div ocupa todo el espacio "vacío" */
-.sidebar-menu {
-  flex-grow: 1; 
-  /* Aquí es donde pondrás tus futuros enlaces (ej. "Inicio", "Cursos", "Perfil") */
+.logout-btn-icon {
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  transition: all 0.2s;
 }
 
-.sidebar-logout {
-  /* Este div se queda al final gracias al flex-grow de .sidebar-menu */
+.logout-btn-icon:hover {
+  background-color: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
 }
 
-.btn-logout {
-  width: 100%;
-}
-
-/* --- Estilos del Contenido Principal --- */
+/* --- Contenido Principal --- */
 .dashboard-content {
-  /* Dejamos un margen a la izquierda igual al ancho del sidebar */
-  margin-left: 260px; 
+  margin-left: var(--sidebar-width);
   flex-grow: 1;
-  padding: 2rem;
-  width: calc(100% - 260px); /* Asegura que el contenido ocupe el resto */
+  padding: 2.5rem;
+  width: calc(100% - var(--sidebar-width));
 }
