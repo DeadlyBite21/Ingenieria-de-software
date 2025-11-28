@@ -58,22 +58,38 @@ export default function EncuestasListPage() {
               </p>
             ) : (
               encuestas.map(enc => (
-                <div key={enc.id} className="d-flex justify-content-between align-items-center p-3 border rounded mb-2">
-                  <div>
-                    <h5 className="mb-0">{enc.titulo}</h5>
-                    <small className="text-muted">
-                      Curso: {enc.nombre_curso} (ID: {enc.id_curso})
-                    </small>
+                  <div key={enc.id} className="d-flex justify-content-between align-items-center p-3 border rounded mb-2">
+                      <div>
+                          <h5 className="mb-0">{enc.titulo}</h5>
+                          <small className="text-muted">
+                              Curso: {enc.nombre_curso} (ID: {enc.id_curso})
+                          </small>
+                      </div>
+                      <div>
+                          <Badge bg={enc.estado === 'publicada' ? 'success' : 'secondary'} className="me-3">
+                              {enc.estado}
+                          </Badge>
+                          
+                          {/* --- LÓGICA DE ACCIÓN: PROFESOR VE RESULTADOS, ALUMNO RESPONDE --- */}
+                          {(isAdmin || isProfesor) ? (
+                              // Profesor/Admin: Ver resultados
+                              <Button 
+                                  as={Link} // Cambiar a Link
+                                  to={`/dashboard/encuestas/resultados/${enc.id}`} // NUEVA RUTA
+                                  variant="outline-info" 
+                                  size="sm" 
+                                  className="ms-3"
+                              >
+                                  <EyeFill className="me-1" /> Ver Resultados
+                              </Button>
+                          ) : (
+                              // Alumno: Responder
+                              <Button as={Link} to={`/dashboard/encuestas/responder/${enc.id}`} variant="success" size="sm" className="ms-3">
+                                  Responder Encuesta
+                              </Button>
+                          )}  
+                      </div>
                   </div>
-                  <div>
-                    <Badge bg={enc.estado === 'publicada' ? 'success' : 'secondary'}>
-                      {enc.estado}
-                    </Badge>
-                    <Button variant="outline-info" size="sm" className="ms-3" disabled>
-                      <EyeFill className="me-1" /> Ver Resultados
-                    </Button>
-                  </div>
-                </div>
               ))
             )}
           </Card.Body>

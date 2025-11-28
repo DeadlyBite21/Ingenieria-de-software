@@ -19,6 +19,8 @@ import CrearEncuestaPage from "./pages/CrearEncuestaPage";
 import CitasListPage from "./pages/CitasListPage";
 import CitasCreatePage from "./pages/CitasCreatePage";
 import CitasDetailPage from "./pages/CitasDetailPage";
+import ResponderEncuestaPage from "./pages/ResponderEncuestaPage";
+import ResultadosEncuestaPage from "./pages/ResultadosEncuestaPage";
 
 // El componente Home (demo de Vite) sigue igual
 function Home() {
@@ -189,6 +191,29 @@ function App() {
               </ProtectedRoute>
             } 
           />
+
+          <Route 
+            path="/dashboard/encuestas/responder/:id" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ResponderEncuestaPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/dashboard/encuestas/resultados/:id" 
+            element={
+              <ProtectedRoute requiredRole={[0, 1]}> {/* Solo Admin (0) y Profesor (1) */}
+                <DashboardLayout>
+                  <ResultadosEncuestaPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+
           <Route 
             path="/dashboard/citas" 
             element={

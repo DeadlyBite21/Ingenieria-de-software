@@ -795,15 +795,263 @@ router.post('/encuestas', authenticateToken, async (req, res) => {
     client.release();
   }
 });
+
+// Obtener preguntas de una encuesta específica (Para responder o revisar)
+router.get('/encuestas/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const usuarioId = req.user.id;
+
+  try {
+    // 1. Obtener datos de la encuesta y sus preguntas
+    const [encuestaRes, preguntasRes] = await Promise.all([
+      pool.query(`SELECT e.*, c.nombre as nombre_curso FROM encuestas e JOIN cursos c ON e.id_curso = c.id WHERE e.id = $1`, [id]),
+      pool.query(`SELECT p.id, p.texto, p.tipo_pregunta FROM preguntas p WHERE p.id_encuesta = $1 ORDER BY p.orden`, [id])
+    ]);
+
+    if (encuestaRes.rows.length === 0) return res.status(404).json({ error: "Encuesta no encontrada." });
+    
+    const encuesta = encuestaRes.rows[0];
+    
+    // 2. Validaciones de Acceso (Seguridad)
+    if (encuesta.estado !== 'publicada' && req.user.rol === 2) {
+      return res.status(403).json({ error: "La encuesta no está disponible." });
+    }
+    
+    // Si es Alumno (Rol 2), verificar si está asignado al curso de la encuesta
+    if (req.user.rol === 2) {
+      const asignadoRes = await pool.query(
+        `SELECT 1 FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2`,
+        [usuarioId, encuesta.id_curso]
+      );
+      if (asignadoRes.rowCount === 0) {
+        return res.status(403).json({ error: "No tienes permiso para ver esta encuesta." });
+      }
+    }
+    
+    // 3. Verificar si el alumno ya respondió
+    let yaRespondio = false;
+    if (req.user.rol === 2) {
+      const respuestaExistente = await pool.query(
+          `SELECT 1 FROM respuestas r JOIN preguntas p ON r.id_pregunta = p.id 
+           WHERE p.id_encuesta = $1 AND r.id_usuario = $2 LIMIT 1`,
+          [id, usuarioId]
+      );
+      yaRespondio = respuestaExistente.rowCount > 0;
+    }
+
+    res.json({
+      ...encuesta,
+      preguntas: preguntasRes.rows,
+      yaRespondio: yaRespondio
+    });
+
+  } catch (e) {
+    console.error("Error al obtener detalle de encuesta:", e);
+    res.status(500).json({ error: "Error en el servidor al obtener encuesta." });
+  }
+});
+
+// Enviar Respuestas (Solo Alumnos)
+router.post('/encuestas/:id/respuestas', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { respuestas } = req.body;
+  const usuarioId = req.user.id;
+
+  // 1. Solo Alumnos pueden responder encuestas
+  if (req.user.rol !== 2) {
+    return res.status(403).json({ error: "Solo los alumnos pueden responder encuestas." });
+  }
+  
+  if (!respuestas || respuestas.length === 0) {
+    return res.status(400).json({ error: "No se recibieron respuestas." });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 2. Seguridad: Verificar que el alumno puede responder (curso y estado publicado)
+    const encuestaRes = await client.query(`
+        SELECT e.id_curso, e.estado FROM encuestas e
+        JOIN curso_usuarios cu ON e.id_curso = cu.curso_id
+        WHERE e.id = $1 AND cu.usuario_id = $2 AND e.estado = 'publicada'`,
+        [id, usuarioId]
+    );
+
+    if (encuestaRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: "Encuesta no disponible o no asignada." });
+    }
+
+    // 3. Procesar y guardar cada respuesta en una transacción
+    const queryPreguntaTipo = await client.query(
+        `SELECT id, tipo_pregunta FROM preguntas WHERE id_encuesta = $1`, [id]
+    );
+    const preguntasMap = queryPreguntaTipo.rows.reduce((map, p) => {
+        map[p.id] = p.tipo_pregunta;
+        return map;
+    }, {});
+    
+    let respuestasGuardadas = 0;
+
+    for (const resp of respuestas) {
+        const tipo = preguntasMap[resp.idPregunta];
+        if (!tipo) continue; // Ignorar respuestas a preguntas inexistentes/no pertenecientes
+
+        let valorEscala = null;
+        let valorTexto = null;
+
+        if (tipo === 'escala_1_5') {
+            valorEscala = resp.valor;
+            if (valorEscala < 1 || valorEscala > 5) throw new Error(`Valor de escala inválido para pregunta ${resp.idPregunta}.`);
+        } else if (tipo === 'texto_libre') {
+            valorTexto = resp.valor;
+            if (!valorTexto || valorTexto.length < 5) throw new Error(`Respuesta de texto libre demasiado corta para pregunta ${resp.idPregunta}.`);
+        }
+        
+        await client.query(
+            `INSERT INTO respuestas (id_pregunta, id_usuario, valor_escala, valor_texto)
+             VALUES ($1, $2, $3, $4)`,
+            [resp.idPregunta, usuarioId, valorEscala, valorTexto]
+        );
+        respuestasGuardadas++;
+    }
+
+    await client.query('COMMIT');
+
+    if (respuestasGuardadas === 0) {
+        return res.status(400).json({ message: "No se guardó ninguna respuesta válida." });
+    }
+
+    res.json({ message: "Respuestas guardadas con éxito.", count: respuestasGuardadas });
+
+  } catch (e) {
+    await client.query('ROLLBACK');
+    // Error 23505 (Unique Violation) ocurre si intenta responder dos veces
+    if (e.code === '23505') {
+        return res.status(400).json({ error: "Ya has respondido esta encuesta." });
+    }
+    console.error("Error al guardar respuestas:", e);
+    res.status(500).json({ error: "Error en el servidor al guardar respuestas." });
+  } finally {
+    client.release();
+  }
+});
+
+// Obtener resultados agregados de una encuesta (Solo Admin y Profesor)
+router.get('/encuestas/:id/resultados', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const usuarioId = req.user.id;
+
+  try {
+    // 1. Verificar si la encuesta existe y obtener datos
+    const encuestaRes = await pool.query(
+        `SELECT id, titulo, descripcion, creado_por FROM encuestas WHERE id = $1`, [id]
+    );
+    if (encuestaRes.rows.length === 0) {
+        return res.status(404).json({ error: "Encuesta no encontrada." });
+    }
+    const encuesta = encuestaRes.rows[0];
+
+    const usuarioRol = req.user.rol;
+    const isCreador = encuesta.creado_por === usuarioId;
+
+    // 2. Seguridad: Solo el creador o un Admin pueden ver los resultados
+    if (usuarioRol === 2) { 
+        return res.status(403).json({ error: "Solo el personal docente/administrativo puede ver resultados." });
+    }
+    if (usuarioRol === 1 && !isCreador) {
+        return res.status(403).json({ error: "No tienes permiso para ver resultados de esta encuesta." });
+    }
+    
+    // 3. Obtener preguntas y sus tipos
+    const preguntasRes = await pool.query(
+        `SELECT id, texto, tipo_pregunta FROM preguntas WHERE id_encuesta = $1 ORDER BY orden`, [id]
+    );
+    const preguntas = preguntasRes.rows;
+    
+    const resultados = [];
+    
+    // 4. Procesar resultados pregunta por pregunta
+    for (const pregunta of preguntas) {
+        let data;
+        
+        if (pregunta.tipo_pregunta === 'escala_1_5') {
+            // Agregación para preguntas de escala (contar cuántos respondieron 1, 2, 3, etc.)
+            const result = await pool.query(
+                `SELECT r.valor_escala AS valor, COUNT(r.id) AS total
+                 FROM respuestas r
+                 WHERE r.id_pregunta = $1 AND r.valor_escala IS NOT NULL
+                 GROUP BY r.valor_escala
+                 ORDER BY r.valor_escala`,
+                [pregunta.id]
+            );
+            data = result.rows.map(row => ({
+                valor: parseInt(row.valor), 
+                total: parseInt(row.total)
+            }));
+            
+        } else if (pregunta.tipo_pregunta === 'texto_libre') {
+            // Listado para respuestas de texto libre
+            const result = await pool.query(
+                `SELECT r.valor_texto AS texto
+                 FROM respuestas r
+                 WHERE r.id_pregunta = $1 AND r.valor_texto IS NOT NULL`,
+                [pregunta.id]
+            );
+            data = result.rows.map(row => row.texto);
+        }
+        
+        resultados.push({
+            idPregunta: pregunta.id,
+            texto: pregunta.texto,
+            tipo: pregunta.tipo_pregunta,
+            data: data || []
+        });
+    }
+
+    res.json({
+        encuesta: { titulo: encuesta.titulo, descripcion: encuesta.descripcion },
+        resultados: resultados
+    });
+
+  } catch (e) {
+    console.error("Error al obtener resultados:", e);
+    res.status(500).json({ error: "Error en el servidor al obtener resultados." });
+  }
+});
 // ================== GESTIÓN DE AGENDA (CITAS) ==================
 
-// Obtener citas del psicólogo (profesor) logueado
+// Obtener lista de psicólogos (Para que el alumno elija)
+router.get('/psicologos', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, nombre, correo FROM usuarios WHERE rol = 3 ORDER BY nombre"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener psicólogos" });
+  }
+});
+// Obtener citas (Modificado para soportar vista de alumno)
 router.get('/citas', authenticateToken, async (req, res) => {
-  const psicologo_id = req.user.id;
+  let psicologo_id;
 
-  // Solo psicólogos pueden ver su agenda
-  if (req.user.rol !== 3 && req.user.rol !== 0) {
-    return res.status(403).json({ error: 'Acceso denegado. Solo para psicólogos.' });
+  // Si es Alumno (2), debe indicar qué agenda quiere ver
+  if (req.user.rol === 2) {
+    if (!req.query.psicologo_id) {
+      return res.status(400).json({ error: 'Debe especificar un psicologo_id' });
+    }
+    psicologo_id = req.query.psicologo_id;
+  } else if (req.user.rol === 3) {
+    // Si es Psicólogo (3), ve su propia agenda
+    psicologo_id = req.user.id;
+  } else if (req.user.rol === 0) {
+     // Si es Admin (0), podría ver cualquiera, aquí asumimos que pasa el ID o ve el suyo
+     psicologo_id = req.query.psicologo_id || req.user.id;
+  } else {
+    return res.status(403).json({ error: 'Acceso denegado.' });
   }
 
   try {
@@ -828,58 +1076,54 @@ router.get('/citas', authenticateToken, async (req, res) => {
   }
 });
 
-// Crear una nueva cita (buscando paciente por nombre)
+// Crear cita (Modificado para Psicólogos y Alumnos)
 router.post('/citas/crear', authenticateToken, async (req, res) => {
-  const psicologo_id = req.user.id;
-  
-  // 1. Recibimos 'nombre_paciente' en lugar de 'paciente_id'
-  const { nombre_paciente, titulo, start, end, notas } = req.body;
+  const { titulo, start, end, notas } = req.body;
+  let psicologo_id;
+  let paciente_id;
 
-  if (req.user.rol !== 1) {
-    return res.status(403).json({ error: 'Solo los psicólogos (rol 1) pueden crear citas.' });
+  // Lógica para Psicólogo (Rol 3): Agenda a un paciente por nombre
+  if (req.user.rol === 3) {
+    psicologo_id = req.user.id;
+    const { nombre_paciente } = req.body;
+    if (!nombre_paciente) return res.status(400).json({ error: 'Falta nombre_paciente' });
+
+    // Buscar ID del paciente
+    const pacienteResult = await pool.query(
+      "SELECT id FROM usuarios WHERE nombre ILIKE $1 AND rol = 2", 
+      [nombre_paciente]
+    );
+    if (pacienteResult.rows.length === 0) return res.status(404).json({ error: 'Paciente no encontrado' });
+    paciente_id = pacienteResult.rows[0].id;
+  } 
+  // Lógica para Alumno (Rol 2): Se agenda a sí mismo con un psicólogo
+  else if (req.user.rol === 2) {
+    paciente_id = req.user.id; // El paciente es el usuario logueado
+    if (!req.body.psicologo_id) return res.status(400).json({ error: 'Falta seleccionar psicólogo' });
+    psicologo_id = req.body.psicologo_id;
+  } 
+  else {
+    return res.status(403).json({ error: 'Permiso denegado' });
   }
 
-  // 2. Validamos los nuevos datos
-  if (!nombre_paciente || !titulo || !start || !end) {
-    return res.status(400).json({ error: 'Faltan datos (nombre_paciente, titulo, start, end)' });
+  if (!titulo || !start || !end) {
+    return res.status(400).json({ error: 'Faltan datos de la cita' });
   }
 
   try {
-    // 3. Buscamos al paciente por nombre Y rol
-    const pacienteResult = await pool.query(
-      "SELECT id FROM usuarios WHERE nombre ILIKE $1 AND rol = 2",
-      [nombre_paciente] // ILIKE ignora mayúsculas/minúsculas
-    );
-
-    // 4. Manejamos si no se encuentra o hay duplicados
-    if (pacienteResult.rows.length === 0) {
-      return res.status(404).json({ error: `Paciente (rol 2) con nombre "${nombre_paciente}" no encontrado.` });
-    }
-    
-    if (pacienteResult.rows.length > 1) {
-      return res.status(400).json({ error: `Múltiples pacientes (rol 2) encontrados con el nombre "${nombre_paciente}". Por favor, sea más específico.` });
-    }
-
-    // 5. Obtenemos el ID del paciente encontrado
-    const paciente_id = pacienteResult.rows[0].id;
-
-    // 6. Insertamos la cita con el ID del paciente
     const result = await pool.query(
       `INSERT INTO citas (psicologo_id, paciente_id, titulo, fecha_hora_inicio, fecha_hora_fin, notas) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *, fecha_hora_inicio AS "start", fecha_hora_fin AS "end"`,
-      [psicologo_id, paciente_id, titulo, start, end, notas]
+      [psicologo_id, paciente_id, titulo, start, end, notas || '']
     );
-    
-    res.status(201).json({ message: "Cita creada con éxito 🚀", cita: result.rows[0] });
-
+    res.status(201).json({ message: "Cita agendada con éxito 🚀", cita: result.rows[0] });
   } catch (err) {
-    // Manejo de conflicto de horario (si las horas se superponen)
     if (err.code === '23P01' || err.code === '40P01') { 
         return res.status(409).json({ error: "El horario seleccionado ya está ocupado." });
     }
-    console.error('Error al crear cita:', err);
-    res.status(500).json({ error: 'Error interno al crear la cita' });
+    console.error(err);
+    res.status(500).json({ error: 'Error al crear la cita' });
   }
 });
 
