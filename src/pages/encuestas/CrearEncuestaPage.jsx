@@ -1,8 +1,7 @@
 // src/pages/CrearEncuestaPage.jsx
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../../utils/api';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
@@ -14,8 +13,6 @@ import { ArrowLeft, Trash, PlusLg } from 'react-bootstrap-icons';
 
 export default function CrearEncuestaPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
   // Estados del formulario
   const [cursos, setCursos] = useState([]); // Cursos del profesor
   const [idCurso, setIdCurso] = useState('');
@@ -24,7 +21,7 @@ export default function CrearEncuestaPage() {
   const [preguntas, setPreguntas] = useState([
     { texto: '', tipo_pregunta: 'escala_1_5' }
   ]);
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -43,7 +40,7 @@ export default function CrearEncuestaPage() {
   }, []);
 
   // --- Handlers para el formulario dinámico ---
-  
+
   const handlePreguntaChange = (index, field, value) => {
     const nuevasPreguntas = [...preguntas];
     nuevasPreguntas[index][field] = value;
@@ -60,12 +57,12 @@ export default function CrearEncuestaPage() {
   };
 
   // --- Handler para enviar ---
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    
+
     // Validar
     if (preguntas.some(p => p.texto.trim() === '')) {
       setError("El texto de todas las preguntas es obligatorio.");
@@ -83,7 +80,7 @@ export default function CrearEncuestaPage() {
           preguntas // El backend espera este array
         })
       });
-      
+
       alert('Encuesta creada exitosamente.');
       navigate('/dashboard/encuestas'); // Redirigir a la lista
 
@@ -92,14 +89,14 @@ export default function CrearEncuestaPage() {
       setLoading(false);
     }
   };
-  
+
   return (
     <div>
       <Link to="/dashboard/encuestas" className="btn btn-outline-secondary mb-3">
         <ArrowLeft className="me-2" />
         Volver a Encuestas
       </Link>
-      
+
       <Card>
         <Card.Header>
           <Card.Title as="h2" className="m-0">
@@ -111,18 +108,18 @@ export default function CrearEncuestaPage() {
             {/* --- Info General --- */}
             <Form.Group className="mb-3" controlId="tituloEncuesta">
               <Form.Label>Título de la Encuesta*</Form.Label>
-              <Form.Control 
-                type="text" 
+              <Form.Control
+                type="text"
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
                 required
                 disabled={loading}
               />
             </Form.Group>
-            
+
             <Form.Group className="mb-3" controlId="idCursoEncuesta">
               <Form.Label>Curso*</Form.Label>
-              <Form.Select 
+              <Form.Select
                 value={idCurso}
                 onChange={(e) => setIdCurso(e.target.value)}
                 required
@@ -138,10 +135,10 @@ export default function CrearEncuestaPage() {
                 ))}
               </Form.Select>
             </Form.Group>
-            
+
             <Form.Group className="mb-3" controlId="descripcionEncuesta">
               <Form.Label>Descripción (Opcional)</Form.Label>
-              <Form.Control 
+              <Form.Control
                 as="textarea"
                 rows={2}
                 value={descripcion}
@@ -150,12 +147,12 @@ export default function CrearEncuestaPage() {
                 placeholder="Instrucciones para los alumnos..."
               />
             </Form.Group>
-            
+
             <hr />
 
             {/* --- Preguntas Dinámicas --- */}
             <h4 className="mb-3">Preguntas</h4>
-            
+
             {preguntas.map((pregunta, index) => (
               <Card key={index} className="mb-3 bg-light">
                 <Card.Body>
@@ -167,18 +164,18 @@ export default function CrearEncuestaPage() {
                       </Button>
                     )}
                   </div>
-                  
+
                   <InputGroup className="mb-2">
                     <InputGroup.Text>Texto:</InputGroup.Text>
-                    <Form.Control 
-                      type="text" 
+                    <Form.Control
+                      type="text"
                       placeholder="Ej: El profesor explica con claridad"
                       value={pregunta.texto}
                       onChange={(e) => handlePreguntaChange(index, 'texto', e.target.value)}
                       required
                     />
                   </InputGroup>
-                  
+
                   <InputGroup>
                     <InputGroup.Text>Tipo:</InputGroup.Text>
                     <Form.Select
@@ -192,7 +189,7 @@ export default function CrearEncuestaPage() {
                 </Card.Body>
               </Card>
             ))}
-            
+
             <Button variant="outline-primary" onClick={addPregunta} disabled={loading} className="mb-3">
               <PlusLg className="me-2" />
               Añadir Pregunta

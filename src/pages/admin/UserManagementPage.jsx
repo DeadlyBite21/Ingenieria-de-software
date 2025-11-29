@@ -1,7 +1,6 @@
-// src/pages/UserManagementPage.jsx
+// src/pages/admin/UserManagementPage.jsx
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
-import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../../utils/api';
 
 // --- Bootstrap Components ---
 import {
@@ -22,12 +21,11 @@ import {
     ExclamationTriangleFill,
     CheckCircleFill,
     XCircleFill,
-    FunnelFill, // Nuevo icono para filtrar
-    Download    // Nuevo icono para descargar
+    FunnelFill,
+    Download
 } from 'react-bootstrap-icons';
 
 export default function UserManagementPage() {
-    const { user } = useAuth();
     const [usuarios, setUsuarios] = useState([]);
     const [cursos, setCursos] = useState([]);
     const [courseUsers, setCourseUsers] = useState({});
@@ -37,7 +35,7 @@ export default function UserManagementPage() {
     // --- Estados de Modals ---
     const [showCreateUser, setShowCreateUser] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [showFilterModal, setShowFilterModal] = useState(false); // Nuevo estado para el modal de filtros
+    const [showFilterModal, setShowFilterModal] = useState(false);
 
     // --- Estados de Datos ---
     const [newUser, setNewUser] = useState({
@@ -60,10 +58,6 @@ export default function UserManagementPage() {
     const [filtroRol, setFiltroRol] = useState('todos');
     const [filtroCurso, setFiltroCurso] = useState('');
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
     const showToast = (message, variant = 'success') => {
         setToastConfig({ show: true, message, variant });
     };
@@ -84,7 +78,8 @@ export default function UserManagementPage() {
                 try {
                     const users = await apiFetch(`/api/cursos/${curso.id}/usuarios`);
                     courseUsersData[curso.id] = users;
-                } catch (err) {
+                } catch (error) {
+                    console.error(error);
                     courseUsersData[curso.id] = [];
                 }
             }
@@ -96,6 +91,11 @@ export default function UserManagementPage() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // --- Handlers ---
 
@@ -244,8 +244,6 @@ export default function UserManagementPage() {
 
             <hr style={{ borderTop: '4px solid black', opacity: 1, marginTop: '0', marginBottom: '2rem' }} />
 
-            {/* (Hemos eliminado la barra de filtros antigua para usar el modal) */}
-
             {/* --- Tabla --- */}
             <div className="table-responsive bg-white border rounded shadow-sm">
                 <Table hover className="mb-0 align-middle">
@@ -290,157 +288,117 @@ export default function UserManagementPage() {
 
             {/* ================= MODALES ================= */}
 
-            {/* 1. Modal FILTRAR (Nuevo) */}
-            <Modal show={showFilterModal} onHide={() => setShowFilterModal(false)} centered backdrop="static">
-                <Modal.Header closeButton>
-                    <Modal.Title className="fw-bold">Filtrar Usuarios</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form>
-                        <FloatingLabel controlId="floatingFilterRole" label="Filtrar por Rol" className="mb-3">
-                            <Form.Select
-                                value={filtroRol}
-                                onChange={(e) => {
-                                    setFiltroRol(e.target.value);
-                                    if (e.target.value !== 'alumnos') setFiltroCurso('');
-                                }}
-                            >
-                                <option value="todos">Todos los Roles</option>
-                                <option value="alumnos">Alumnos</option>
-                                <option value="profesores">Profesores</option>
-                                <option value="admins">Administradores</option>
-                            </Form.Select>
-                        </FloatingLabel>
-
-                        {filtroRol === 'alumnos' && (
-                            <FloatingLabel controlId="floatingFilterCourse" label="Filtrar por Curso" className="animate-fade-in">
-                                <Form.Select
-                                    value={filtroCurso}
-                                    onChange={(e) => setFiltroCurso(e.target.value)}
-                                >
-                                    <option value="">Todos los Cursos</option>
-                                    {cursos.map(c => (
-                                        <option key={c.id} value={c.id}>{c.nombre}</option>
-                                    ))}
-                                </Form.Select>
-                            </FloatingLabel>
-                        )}
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="outline-secondary" onClick={handleResetFilters}>
-                        Limpiar Filtros
-                    </Button>
-                    <Button variant="primary" onClick={() => setShowFilterModal(false)}>
-                        Aplicar
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-
-            {/* 2. Modal Crear Usuario */}
-            <Modal show={showCreateUser} onHide={() => setShowCreateUser(false)} centered backdrop="static" size="lg">
+            {/* 1. Crear Usuario */}
+            <Modal show={showCreateUser} onHide={() => setShowCreateUser(false)} centered backdrop="static">
                 <Modal.Header closeButton>
                     <Modal.Title className="fw-bold">Crear Nuevo Usuario</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleCreateUser}>
                     <Modal.Body>
-                        <div className="row g-3">
-                            <div className="col-md-6">
-                                <FloatingLabel controlId="floatingRol" label="Rol del Usuario">
-                                    <Form.Select
-                                        value={newUser.rol}
-                                        onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}
-                                        required
-                                    >
-                                        <option value="">Seleccionar...</option>
-                                        <option value="0">Administrador</option>
-                                        <option value="1">Profesor</option>
-                                        <option value="2">Alumno</option>
-                                    </Form.Select>
-                                </FloatingLabel>
-                            </div>
-                            <div className="col-md-6">
-                                <FloatingLabel controlId="floatingRut" label="RUT">
-                                    <Form.Control
-                                        type="text"
-                                        placeholder="12.345.678-9"
-                                        value={newUser.rut}
-                                        onChange={(e) => setNewUser({ ...newUser, rut: e.target.value })}
-                                        required
-                                    />
-                                </FloatingLabel>
-                            </div>
-                            <div className="col-md-12">
-                                <FloatingLabel controlId="floatingNombre" label="Nombre Completo">
-                                    <Form.Control
-                                        type="text"
-                                        placeholder="Nombre"
-                                        value={newUser.nombre}
-                                        onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })}
-                                        required
-                                    />
-                                </FloatingLabel>
-                            </div>
-                            <div className="col-md-6">
-                                <FloatingLabel controlId="floatingCorreo" label="Correo Electrónico">
-                                    <Form.Control
-                                        type="email"
-                                        placeholder="nombre@ejemplo.com"
-                                        value={newUser.correo}
-                                        onChange={(e) => setNewUser({ ...newUser, correo: e.target.value })}
-                                        required
-                                    />
-                                </FloatingLabel>
-                            </div>
-                            <div className="col-md-6">
-                                <FloatingLabel controlId="floatingPass" label="Contraseña">
-                                    <Form.Control
-                                        type="password"
-                                        placeholder="Contraseña"
-                                        value={newUser.contrasena}
-                                        onChange={(e) => setNewUser({ ...newUser, contrasena: e.target.value })}
-                                        required
-                                    />
-                                </FloatingLabel>
-                            </div>
-                        </div>
+                        <FloatingLabel controlId="floatingRut" label="RUT" className="mb-3">
+                            <Form.Control
+                                type="text" placeholder="12345678-9"
+                                value={newUser.rut} onChange={(e) => setNewUser({ ...newUser, rut: e.target.value })}
+                                required autoFocus
+                            />
+                        </FloatingLabel>
+                        <FloatingLabel controlId="floatingNombre" label="Nombre Completo" className="mb-3">
+                            <Form.Control
+                                type="text" placeholder="Juan Pérez"
+                                value={newUser.nombre} onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })}
+                                required
+                            />
+                        </FloatingLabel>
+                        <FloatingLabel controlId="floatingEmail" label="Correo Electrónico" className="mb-3">
+                            <Form.Control
+                                type="email" placeholder="nombre@ejemplo.com"
+                                value={newUser.correo} onChange={(e) => setNewUser({ ...newUser, correo: e.target.value })}
+                                required
+                            />
+                        </FloatingLabel>
+                        <FloatingLabel controlId="floatingPassword" label="Contraseña" className="mb-3">
+                            <Form.Control
+                                type="password" placeholder="Contraseña"
+                                value={newUser.contrasena} onChange={(e) => setNewUser({ ...newUser, contrasena: e.target.value })}
+                                required
+                            />
+                        </FloatingLabel>
+                        <FloatingLabel controlId="floatingRol" label="Rol del Usuario">
+                            <Form.Select
+                                value={newUser.rol} onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}
+                                required
+                            >
+                                <option value="">Selecciona un rol...</option>
+                                <option value="0">Administrador</option>
+                                <option value="1">Profesor</option>
+                                <option value="2">Alumno</option>
+                                <option value="3">Psicólogo</option>
+                            </Form.Select>
+                        </FloatingLabel>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button variant="outline-danger" onClick={() => setShowCreateUser(false)}>Cancelar</Button>
-                        <Button variant="success" type="submit">Guardar Usuario</Button>
+                        <Button variant="outline-secondary" onClick={() => setShowCreateUser(false)}>Cancelar</Button>
+                        <Button variant="primary" type="submit">Guardar Usuario</Button>
                     </Modal.Footer>
                 </Form>
             </Modal>
 
-            {/* 3. Confirmar Eliminación */}
-            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered backdrop="static">
+            {/* 2. Confirmar Eliminación */}
+            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
                 <Modal.Header closeButton className="bg-danger text-white">
-                    <Modal.Title className="fw-bold d-flex align-items-center gap-2">
-                        <ExclamationTriangleFill /> Confirmar Eliminación
-                    </Modal.Title>
+                    <Modal.Title><ExclamationTriangleFill className="me-2" /> Confirmar Eliminación</Modal.Title>
                 </Modal.Header>
-                <Modal.Body className="text-center py-4">
-                    <p className="fs-5">
-                        ¿Estás seguro de que quieres eliminar al usuario <br />
-                        <strong>"{userToDelete?.nombre}"</strong>?
-                    </p>
-                    <p className="text-muted small">Esta acción no se puede deshacer.</p>
+                <Modal.Body>
+                    ¿Estás seguro que deseas eliminar al usuario <strong>{userToDelete?.nombre}</strong>?
+                    <br />
+                    Esta acción no se puede deshacer.
                 </Modal.Body>
-                <Modal.Footer className="justify-content-center">
-                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)} className="px-4">Cancelar</Button>
-                    <Button variant="danger" onClick={confirmDeleteUser} className="px-4">Sí, Eliminar</Button>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancelar</Button>
+                    <Button variant="danger" onClick={confirmDeleteUser}>Eliminar</Button>
                 </Modal.Footer>
             </Modal>
 
-            {/* --- TOASTS --- */}
-            <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 9999 }}>
-                <Toast
-                    onClose={() => setToastConfig({ ...toastConfig, show: false })}
-                    show={toastConfig.show}
-                    delay={4000}
-                    autohide
-                    bg={toastConfig.variant}
-                >
+            {/* 3. Modal de Filtros (Nuevo) */}
+            <Modal show={showFilterModal} onHide={() => setShowFilterModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title className="fw-bold">Filtrar Usuarios</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form>
+                        <Form.Group className="mb-3">
+                            <Form.Label className="fw-bold">Por Rol</Form.Label>
+                            <Form.Select value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)}>
+                                <option value="todos">Todos los roles</option>
+                                <option value="alumnos">Solo Alumnos</option>
+                                <option value="profesores">Solo Profesores</option>
+                                <option value="admins">Solo Administradores</option>
+                            </Form.Select>
+                        </Form.Group>
+
+                        {/* Mostrar filtro de curso solo si el rol seleccionado es Alumnos */}
+                        {filtroRol === 'alumnos' && (
+                            <Form.Group className="mb-3">
+                                <Form.Label className="fw-bold">Por Curso</Form.Label>
+                                <Form.Select value={filtroCurso} onChange={(e) => setFiltroCurso(e.target.value)}>
+                                    <option value="">Todos los cursos</option>
+                                    {cursos.map(c => (
+                                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
+                        )}
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="outline-secondary" onClick={handleResetFilters}>Limpiar Filtros</Button>
+                    <Button variant="primary" onClick={() => setShowFilterModal(false)}>Aplicar</Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Toast de Notificaciones */}
+            <ToastContainer position="bottom-end" className="p-3">
+                <Toast onClose={() => setToastConfig({ ...toastConfig, show: false })} show={toastConfig.show} delay={3000} autohide bg={toastConfig.variant}>
                     <Toast.Header>
                         {toastConfig.variant === 'success' ? <CheckCircleFill className="text-success me-2" /> : <XCircleFill className="text-danger me-2" />}
                         <strong className="me-auto">Sistema</strong>

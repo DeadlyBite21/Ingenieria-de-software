@@ -1,29 +1,30 @@
+
 import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login'; // Importamos la página de Login
-import DashboardRouter from './components/DashboardRouter';
-import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/auth/Login';
+import DashboardRouter from './components/dashboard/DashboardRouter';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
-import DashboardLayout from "./components/DashboardLayout"; // Necesario para las rutas
-import IncidentsPage from "./pages/IncidentsPage";
-import IncidentCreatePage from "./pages/IncidentCreatePage";
-import IncidentDetailPage from "./pages/IncidentDetailPage";
-import RecoverPassword from './pages/RecoverPassword';
-import ResetPassword from './pages/ResetPassword';
-import EncuestasListPage from "./pages/EncuestasListPage";
-import CrearEncuestaPage from "./pages/CrearEncuestaPage";
-import CitasListPage from "./pages/CitasListPage";
-import CitasCreatePage from "./pages/CitasCreatePage";
-import CitasDetailPage from "./pages/CitasDetailPage";
-import UserManagementPage from "./pages/UserManagementPage"; // <--- NUEVA IMPORTACIÓN
+import DashboardLayout from "./components/dashboard/DashboardLayout";
+import IncidentsPage from "./pages/incidents/IncidentsPage";
+import IncidentCreatePage from "./pages/incidents/IncidentCreatePage";
+import IncidentDetailPage from "./pages/incidents/IncidentDetailPage";
+import RecoverPassword from './pages/auth/RecoverPassword';
+import ResetPassword from './pages/auth/ResetPassword';
+import EncuestasListPage from "./pages/encuestas/EncuestasListPage";
+import CrearEncuestaPage from "./pages/encuestas/CrearEncuestaPage";
+import CitasListPage from "./pages/citas/CitasListPage";
+import CitasCreatePage from "./pages/citas/CitasCreatePage";
+import CitasDetailPage from "./pages/citas/CitasDetailPage";
+import UserManagementPage from "./pages/admin/UserManagementPage";
 
 // El componente Home (demo de Vite) sigue igual
 function Home() {
-  const { user } = useAuth();
+
   const [count, setCount] = useState(0);
 
   return (

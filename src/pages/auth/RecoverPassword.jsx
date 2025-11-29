@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
+import { Link } from 'react-router-dom';
+import { apiFetch } from '../../utils/api';
 import Container from 'react-bootstrap/Container';
 import Card from 'react-bootstrap/Card';
 import Form from 'react-bootstrap/Form';
@@ -16,7 +16,7 @@ export default function RecoverPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   // Añade la clase 'login-active' al body para el fondo
   useEffect(() => {
     document.body.classList.add('login-active');

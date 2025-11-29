@@ -1,8 +1,8 @@
 // src/pages/EncuestasListPage.jsx
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../../utils/api';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
@@ -12,7 +12,7 @@ import Badge from 'react-bootstrap/Badge';
 import { PlusCircleFill, EyeFill } from 'react-bootstrap-icons';
 
 export default function EncuestasListPage() {
-  const { user, isAdmin, isProfesor } = useAuth();
+  const { isAdmin, isProfesor } = useAuth();
   const [encuestas, setEncuestas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -47,7 +47,7 @@ export default function EncuestasListPage() {
 
       {loading && <div className="text-center my-5"><Spinner animation="border" /></div>}
       {error && <Alert variant="danger">Error: {error}</Alert>}
-      
+
       {!loading && !error && (
         <Card>
           <Card.Header>{encuestas.length} Encuestas encontradas</Card.Header>

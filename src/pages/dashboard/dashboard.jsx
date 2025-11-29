@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiFetch } from "../../backend/api";
+import { apiFetch } from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 
-export default function CoursesPage() {
-  const [me, setMe] = useState(null);
+export default function Dashboard() {
+  const { user, logout } = useAuth();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -11,9 +12,7 @@ export default function CoursesPage() {
   useEffect(() => {
     (async () => {
       try {
-        const profile = await apiFetch("/api/me");
-        setMe(profile);
-        const list = await apiFetch("/api/courses");
+        const list = await apiFetch("/api/cursos");
         setCourses(list);
       } catch (e) {
         setErr(e.message);
@@ -26,13 +25,18 @@ export default function CoursesPage() {
   if (loading) return <div style={{ padding: 16 }}>Cargando…</div>;
   if (err) return <div style={{ padding: 16, color: "tomato" }}>{err}</div>;
 
-  const rolLabel = me?.rol === 0 ? "Administrador" : me?.rol === 1 ? "Profesor" : "Alumno";
+  const rolLabel = user?.rol === 0 ? "Administrador" : user?.rol === 1 ? "Profesor" : "Alumno";
 
   return (
     <div style={{ padding: 24 }}>
-      <h1>Menú principal</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h1>Dashboard</h1>
+        <button onClick={logout} style={{ padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+          Cerrar Sesión
+        </button>
+      </div>
       <p>
-        Bienvenido <strong>{me?.nombre}</strong> — Rol: <em>{rolLabel}</em>
+        Hola <strong>{user?.nombre}</strong> — Rol: <em>{rolLabel}</em>
       </p>
 
       {courses.length === 0 ? (
@@ -46,7 +50,7 @@ export default function CoursesPage() {
                   <strong>{c.nombre}</strong>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>ID: {c.id}</div>
                 </div>
-                <Link to={`/courses/${c.id}`} style={{ textDecoration: "none" }}>
+                <Link to={`/dashboard/courses/${c.id}`} style={{ textDecoration: "none" }}>
                   Ver curso →
                 </Link>
               </div>

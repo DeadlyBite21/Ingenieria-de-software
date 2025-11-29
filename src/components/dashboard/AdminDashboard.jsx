@@ -1,7 +1,6 @@
-// src/components/AdminDashboard.jsx
+// src/components/dashboard/AdminDashboard.jsx
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../../utils/api';
 
 // --- Importaciones de Bootstrap Components ---
 import {
@@ -28,7 +27,6 @@ import {
 } from 'react-bootstrap-icons';
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +86,8 @@ export default function AdminDashboard() {
           // Obtener usuarios reales del backend
           const users = await apiFetch(`/api/cursos/${curso.id}/usuarios`);
           courseUsersData[curso.id] = users;
-        } catch (err) {
+        } catch (error) {
+          console.error(error);
           courseUsersData[curso.id] = [];
         }
 
@@ -149,6 +148,7 @@ export default function AdminDashboard() {
       loadData();
       showToast(`Se eliminó el curso "${courseToDelete.nombre}" con éxito`, 'success');
     } catch (err) {
+      console.error(err);
       showToast('Hubo un error inesperado al eliminar', 'danger');
     } finally {
       setShowDeleteModal(false);
@@ -336,14 +336,17 @@ export default function AdminDashboard() {
             <FloatingLabel controlId="floatingSelectCourse" label="Seleccionar Curso" className="mb-3">
               <Form.Select onChange={(e) => setSelectedCourse(cursos.find(c => c.id === parseInt(e.target.value)))} defaultValue="">
                 <option value="" disabled>Elige un curso...</option>
-                {cursos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                {cursos.map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
               </Form.Select>
             </FloatingLabel>
+
             <FloatingLabel controlId="floatingSelectUser" label="Seleccionar Usuario">
-              <Form.Select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>
-                <option value="">Elige un usuario...</option>
+              <Form.Select onChange={(e) => setSelectedUser(e.target.value)} defaultValue="">
+                <option value="" disabled>Elige un usuario...</option>
                 {usuarios.map(u => (
-                  <option key={u.id} value={u.id}>{u.nombre} ({u.rol === 1 ? 'Profesor' : 'Alumno'})</option>
+                  <option key={u.id} value={u.id}>{u.nombre} ({u.rut})</option>
                 ))}
               </Form.Select>
             </FloatingLabel>
@@ -356,51 +359,45 @@ export default function AdminDashboard() {
       </Modal>
 
       {/* 3. Confirmar Eliminación */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered backdrop="static">
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
         <Modal.Header closeButton className="bg-danger text-white">
-          <Modal.Title className="fw-bold d-flex align-items-center gap-2">
-            <ExclamationTriangleFill /> Confirmar Eliminación
-          </Modal.Title>
+          <Modal.Title><ExclamationTriangleFill className="me-2" /> Confirmar Eliminación</Modal.Title>
         </Modal.Header>
-        <Modal.Body className="text-center py-4">
-          <p className="fs-5">
-            ¿Estás seguro de que quieres eliminar el curso <br />
-            <strong>"{courseToDelete?.nombre}"</strong>?
-          </p>
-          <p className="text-muted small">Esta acción no se puede deshacer.</p>
+        <Modal.Body>
+          ¿Estás seguro que deseas eliminar el curso <strong>{courseToDelete?.nombre}</strong>?
+          <br />
+          Esta acción no se puede deshacer.
         </Modal.Body>
-        <Modal.Footer className="justify-content-center">
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)} className="px-4">Cancelar</Button>
-          <Button variant="danger" onClick={confirmDeleteCourse} className="px-4">Sí, Eliminar</Button>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancelar</Button>
+          <Button variant="danger" onClick={confirmDeleteCourse}>Eliminar</Button>
         </Modal.Footer>
       </Modal>
 
-      {/* 4. Lista de Alumnos (CSV) */}
-      <Modal show={showUserListModal} onHide={() => setShowUserListModal(false)} centered size="lg" scrollable>
+      {/* 4. Lista de Usuarios (Modal) */}
+      <Modal show={showUserListModal} onHide={() => setShowUserListModal(false)} centered scrollable>
         <Modal.Header closeButton>
           <Modal.Title className="fw-bold">Integrantes: {currentCourseName}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {currentCourseUsers.length === 0 ? (
-            <p className="text-center text-muted my-4">No hay usuarios asignados a este curso.</p>
+            <p className="text-center text-muted">No hay usuarios en este curso.</p>
           ) : (
-            <Table striped hover responsive className="align-middle">
-              <thead className="table-light">
+            <Table striped bordered hover size="sm">
+              <thead>
                 <tr>
                   <th>Nombre</th>
-                  <th>RUT</th>
-                  <th>Correo</th>
                   <th>Rol</th>
                 </tr>
               </thead>
               <tbody>
-                {currentCourseUsers.map(u => (
-                  <tr key={u.id} className={u.rol === 1 ? 'table-warning' : ''}>
-                    <td className="fw-500">{u.nombre}</td>
-                    <td>{u.rut}</td>
-                    <td>{u.correo}</td>
+                {currentCourseUsers.map((u) => (
+                  <tr key={u.id}>
+                    <td>{u.nombre}</td>
                     <td>
-                      {u.rol === 1 ? <span className="badge bg-warning text-dark">Profesor</span> : <span className="badge bg-secondary">Alumno</span>}
+                      {u.rol === 1 ? <span className="badge bg-warning text-dark">Profesor</span> :
+                        u.rol === 2 ? <span className="badge bg-primary">Alumno</span> :
+                          <span className="badge bg-secondary">Otro</span>}
                     </td>
                   </tr>
                 ))}
@@ -409,22 +406,16 @@ export default function AdminDashboard() {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowUserListModal(false)}>Cerrar</Button>
-          <Button variant="primary" onClick={handleDownloadCSV} disabled={currentCourseUsers.length === 0}>
-            <Download className="me-2" /> Descargar CSV
+          <Button variant="outline-dark" onClick={handleDownloadCSV} disabled={currentCourseUsers.length === 0}>
+            <Download className="me-2" /> Descargar Lista
           </Button>
+          <Button variant="secondary" onClick={() => setShowUserListModal(false)}>Cerrar</Button>
         </Modal.Footer>
       </Modal>
 
-      {/* --- TOASTS --- */}
-      <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 9999 }}>
-        <Toast
-          onClose={() => setToastConfig({ ...toastConfig, show: false })}
-          show={toastConfig.show}
-          delay={4000}
-          autohide
-          bg={toastConfig.variant}
-        >
+      {/* Toast de Notificaciones */}
+      <ToastContainer position="bottom-end" className="p-3">
+        <Toast onClose={() => setToastConfig({ ...toastConfig, show: false })} show={toastConfig.show} delay={3000} autohide bg={toastConfig.variant}>
           <Toast.Header>
             {toastConfig.variant === 'success' ? <CheckCircleFill className="text-success me-2" /> : <XCircleFill className="text-danger me-2" />}
             <strong className="me-auto">Sistema</strong>

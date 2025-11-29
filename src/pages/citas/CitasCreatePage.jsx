@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../../utils/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'react-bootstrap-icons';
 import { Form, Button, Card, Alert, Spinner } from 'react-bootstrap';
@@ -31,7 +31,7 @@ export default function CitasCreatePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
+
     // Combinar fecha y hora para ISO string
     const fechaHora = new Date(`${formData.fecha}T${formData.hora}`).toISOString();
 
@@ -62,13 +62,13 @@ export default function CitasCreatePage() {
         <Card.Header><h4>Agendar Nueva Cita</h4></Card.Header>
         <Card.Body>
           {error && <Alert variant="danger">{error}</Alert>}
-          
+
           <Form onSubmit={handleSubmit}>
             <Form.Group className="mb-3">
               <Form.Label>Alumno</Form.Label>
-              <Form.Select 
+              <Form.Select
                 value={formData.idAlumno}
-                onChange={e => setFormData({...formData, idAlumno: e.target.value})}
+                onChange={e => setFormData({ ...formData, idAlumno: e.target.value })}
                 required
               >
                 <option value="">Seleccione un alumno...</option>
@@ -82,22 +82,22 @@ export default function CitasCreatePage() {
               <div className="col-md-6">
                 <Form.Group className="mb-3">
                   <Form.Label>Fecha</Form.Label>
-                  <Form.Control 
-                    type="date" 
-                    required 
+                  <Form.Control
+                    type="date"
+                    required
                     value={formData.fecha}
-                    onChange={e => setFormData({...formData, fecha: e.target.value})}
+                    onChange={e => setFormData({ ...formData, fecha: e.target.value })}
                   />
                 </Form.Group>
               </div>
               <div className="col-md-6">
                 <Form.Group className="mb-3">
                   <Form.Label>Hora</Form.Label>
-                  <Form.Control 
-                    type="time" 
-                    required 
+                  <Form.Control
+                    type="time"
+                    required
                     value={formData.hora}
-                    onChange={e => setFormData({...formData, hora: e.target.value})}
+                    onChange={e => setFormData({ ...formData, hora: e.target.value })}
                   />
                 </Form.Group>
               </div>
@@ -105,28 +105,28 @@ export default function CitasCreatePage() {
 
             <Form.Group className="mb-3">
               <Form.Label>Motivo</Form.Label>
-              <Form.Control 
-                type="text" 
+              <Form.Control
+                type="text"
                 placeholder="Ej: Revisión de notas, conducta..."
-                required 
+                required
                 value={formData.motivo}
-                onChange={e => setFormData({...formData, motivo: e.target.value})}
+                onChange={e => setFormData({ ...formData, motivo: e.target.value })}
               />
             </Form.Group>
 
             <Form.Group className="mb-3">
               <Form.Label>Lugar (Opcional)</Form.Label>
-              <Form.Control 
-                type="text" 
+              <Form.Control
+                type="text"
                 placeholder="Ej: Sala 203"
                 value={formData.lugar}
-                onChange={e => setFormData({...formData, lugar: e.target.value})}
+                onChange={e => setFormData({ ...formData, lugar: e.target.value })}
               />
             </Form.Group>
 
             <div className="d-grid">
               <Button type="submit" disabled={loading}>
-                {loading ? <Spinner size="sm" animation="border"/> : 'Guardar Cita'}
+                {loading ? <Spinner size="sm" animation="border" /> : 'Guardar Cita'}
               </Button>
             </div>
           </Form>

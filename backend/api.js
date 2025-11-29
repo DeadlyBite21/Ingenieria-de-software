@@ -1,6 +1,6 @@
+/* eslint-disable no-undef */
 import { Router } from "express";
 import jwt from "jsonwebtoken";
-import fetch from "node-fetch";
 import pkg from "pg";
 import bcrypt from "bcryptjs"; // para encriptar contraseñas
 import dotenv from "dotenv";
@@ -53,7 +53,7 @@ router.post("/login", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT * FROM usuarios WHERE rut::text = $1 OR correo = $1", 
+      "SELECT * FROM usuarios WHERE rut::text = $1 OR correo = $1",
       [identificador]
     );
 
@@ -133,20 +133,20 @@ router.post("/usuarios/crear", authenticateToken, isAdmin, async (req, res) => {
   if (![0, 1, 2, 3].includes(rol) || !rut || !nombre || !correo || !contrasena) {
     return res.status(400).json({ error: "Faltan datos o el rol es inválido" });
   }
-if(contrasena.length < 6) {
-  return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
-}
-for(let i = 0; i < contrasena.length; i++) {
-  if(contrasena[i] === ' ') {
-    return res.status(400).json({ error: "La contraseña no puede contener espacios" });
+  if (contrasena.length < 6) {
+    return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
   }
-}
-const specialCharRegex = /[%&\$#@!]/;
-//Comprueba si la contraseña NO contiene (.test() da false) ninguno de esos caracteres.
-if (!specialCharRegex.test(contrasena)) {
-  // 3. Si no encontró ninguno, retorna el error.
-  return res.status(400).json({ error: "La contraseña debe contener al menos un carácter especial (%&$#@!)" });
-}
+  for (let i = 0; i < contrasena.length; i++) {
+    if (contrasena[i] === ' ') {
+      return res.status(400).json({ error: "La contraseña no puede contener espacios" });
+    }
+  }
+  const specialCharRegex = /[%&$#@!]/;
+  //Comprueba si la contraseña NO contiene (.test() da false) ninguno de esos caracteres.
+  if (!specialCharRegex.test(contrasena)) {
+    // 3. Si no encontró ninguno, retorna el error.
+    return res.status(400).json({ error: "La contraseña debe contener al menos un carácter especial (%&$#@!)" });
+  }
 
   try {
     const hashedPassword = await bcrypt.hash(contrasena, 10);
@@ -157,8 +157,7 @@ if (!specialCharRegex.test(contrasena)) {
     );
 
     res.status(201).json(result.rows[0]);
-  } catch (err)
- {
+  } catch (err) {
     if (err.code === "23505") { // Error de constraint único
       if (err.constraint === "usuarios_rut_key") {
         return res.status(400).json({ error: "El RUT ya está registrado" });
@@ -185,23 +184,23 @@ router.delete("/usuarios/:id", authenticateToken, isAdmin, async (req, res) => {
 
   try {
     await client.query("BEGIN");
-    
+
     // 1. Eliminar relaciones en curso_usuarios
     await client.query("DELETE FROM curso_usuarios WHERE usuario_id = $1", [id]);
-    
+
     // 2. Anonimizar incidentes creados por el usuario (o eliminar, según prefieras)
     // Aquí los desasignamos para mantener el historial:
     await client.query("UPDATE incidentes SET creado_por = NULL WHERE creado_por = $1", [id]);
-    
+
     // 3. Eliminar al usuario
     const result = await client.query("DELETE FROM usuarios WHERE id = $1 RETURNING id, rut, nombre", [id]);
-    
+
     await client.query("COMMIT");
-    
+
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
-    
+
     res.json({ message: "Usuario eliminado exitosamente", usuario: result.rows[0] });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -266,7 +265,7 @@ router.get("/cursos", authenticateToken, async (req, res) => {
       const result = await pool.query("SELECT * FROM cursos ORDER BY id");
       return res.json(result.rows);
     }
-    
+
     // Si es profesor (1) o alumno (2), ve solo sus cursos asignados
     const result = await pool.query(
       `SELECT c.* FROM cursos c
@@ -276,7 +275,7 @@ router.get("/cursos", authenticateToken, async (req, res) => {
       [req.user.id]
     );
     res.json(result.rows);
-    
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al obtener cursos" });
@@ -290,22 +289,22 @@ router.delete("/cursos/:id", authenticateToken, isAdmin, async (req, res) => {
 
   try {
     await client.query("BEGIN");
-    
+
     // 1. Eliminar relaciones en curso_usuarios
     await client.query("DELETE FROM curso_usuarios WHERE curso_id = $1", [id]);
-    
+
     // 2. Eliminar incidentes relacionados
     await client.query("DELETE FROM incidentes WHERE id_curso = $1", [id]);
-    
+
     // 3. Eliminar el curso
     const result = await client.query("DELETE FROM cursos WHERE id = $1 RETURNING *", [id]);
-    
+
     await client.query("COMMIT");
-    
+
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Curso no encontrado" });
     }
-    
+
     res.json({ message: "Curso y sus relaciones eliminados exitosamente", curso: result.rows[0] });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -326,10 +325,10 @@ router.post("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin, 
     const usuario = userCheck.rows[0];
     // Admin (rol 0) no se asigna a cursos
     if (usuario.rol === 0) {
-       return res.status(400).json({ error: "Los Administradores no se asignan a cursos" });
+      return res.status(400).json({ error: "Los Administradores no se asignan a cursos" });
     }
-    if(usuario.rol === 3) {
-        return res.status(400).json({ error: "Los Psicólogos no se asignan a cursos" });
+    if (usuario.rol === 3) {
+      return res.status(400).json({ error: "Los Psicólogos no se asignan a cursos" });
     }
 
     const result = await pool.query(
@@ -426,7 +425,7 @@ router.post('/incidentes', authenticateToken, async (req, res) => {
     }
     // Si es Alumno (rol=2), no puede crear incidentes
     if (req.user?.rol === 2) {
-        return res.status(403).json({ error: "No tienes permisos para crear incidentes." });
+      return res.status(403).json({ error: "No tienes permisos para crear incidentes." });
     }
     // Admin (rol=0) puede crear en cualquier curso
 
@@ -467,11 +466,11 @@ router.get('/incidentes', authenticateToken, async (req, res) => {
     const values = [];
     let i = 1;
 
-    if (idCurso)  { where.push(`id_curso = $${i++}`); values.push(+idCurso); }
-    if (estado)   { where.push(`estado = $${i++}`);   values.push(estado); }
+    if (idCurso) { where.push(`id_curso = $${i++}`); values.push(+idCurso); }
+    if (estado) { where.push(`estado = $${i++}`); values.push(estado); }
     if (idAlumno) { where.push(`alumnos @> $${i++}::jsonb`); values.push(JSON.stringify([+idAlumno])); }
-    if (from)     { where.push(`fecha >= $${i++}`);   values.push(new Date(from)); }
-    if (to)       { where.push(`fecha <= $${i++}`);   values.push(new Date(to)); }
+    if (from) { where.push(`fecha >= $${i++}`); values.push(new Date(from)); }
+    if (to) { where.push(`fecha <= $${i++}`); values.push(new Date(to)); }
 
     // Profesor (rol=1): limitar a cursos donde participa
     if (req.user?.rol === 1) {
@@ -524,7 +523,7 @@ router.get('/incidentes/:id', authenticateToken, async (req, res) => {
       );
       if (check.rowCount === 0) return res.status(403).json({ error: "Sin permisos" });
     }
-    
+
     // Alumno (rol=2): verificar que está en la lista de alumnos
     if (req.user?.rol === 2) {
       const esInvolucrado = (incidente.alumnos || []).includes(req.user.id);
@@ -545,9 +544,9 @@ router.patch('/incidentes/:id', authenticateToken, async (req, res) => {
   try {
     // Alumnos (rol=2) no pueden editar
     if (req.user?.rol === 2) {
-       return res.status(403).json({ error: "No tienes permisos para editar incidentes." });
+      return res.status(403).json({ error: "No tienes permisos para editar incidentes." });
     }
-    
+
     const { id } = req.params;
 
     // Mapa payload → columnas
@@ -571,7 +570,7 @@ router.patch('/incidentes/:id', authenticateToken, async (req, res) => {
 
     for (const [k, col] of Object.entries(map)) {
       if (k in req.body) {
-        if (["alumnos","participantes","medidas","adjuntos"].includes(k)) {
+        if (["alumnos", "participantes", "medidas", "adjuntos"].includes(k)) {
           sets.push(`${col} = $${i++}::jsonb`);
           values.push(JSON.stringify(req.body[k]));
         } else {
@@ -641,11 +640,11 @@ router.post("/recover-password", async (req, res) => {
     //   console.error("Error al enviar correo con n8n:", err);
     //   return res.status(500).json({ error: "No se pudo enviar el correo" });
     // }
-    
+
     // (Tu frontend no usa n8n, así que solo devolvemos éxito)
 
     res.json({ message: "Correo de recuperación enviado correctamente" });
-  
+
   } catch (err) {
     console.error("Error en /recover-password:", err);
     res.status(500).json({ error: "Error en el servidor" });
@@ -663,13 +662,14 @@ router.post("/reset-password", async (req, res) => {
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
+    console.error(err);
     return res.status(403).json({ error: "Token inválido o expirado" });
   }
 
   try {
     const { email } = decoded;
     const hashedPassword = await bcrypt.hash(nuevaContrasena, 10);
-    
+
     const result = await pool.query(
       "UPDATE usuarios SET contrasena = $1 WHERE correo = $2 RETURNING id",
       [hashedPassword, email]
@@ -692,7 +692,7 @@ router.get('/encuestas', authenticateToken, async (req, res) => {
   try {
     let query;
     // 1. INICIAMOS 'values' COMO UN ARRAY VACÍO
-    const values = []; 
+    const values = [];
 
     if (req.user.rol === 0) {
       // Admin ve todas (Esta consulta no usa parámetros)
@@ -709,7 +709,7 @@ router.get('/encuestas', authenticateToken, async (req, res) => {
                WHERE e.creado_por = $1
                ORDER BY e.fecha_creacion DESC`;
       // 2. AÑADIMOS EL VALOR SOLO CUANDO SE NECESITA
-      values.push(req.user.id); 
+      values.push(req.user.id);
     } else {
       // Alumno ve las de sus cursos
       query = `SELECT e.*, c.nombre as nombre_curso 
@@ -720,9 +720,9 @@ router.get('/encuestas', authenticateToken, async (req, res) => {
                )
                ORDER BY e.fecha_creacion DESC`;
       // 3. AÑADIMOS EL VALOR SOLO CUANDO SE NECESITA
-      values.push(req.user.id); 
+      values.push(req.user.id);
     }
-    
+
     // Ahora la llamada es correcta:
     // Si es Admin: pool.query(query, [])
     // Si es Profesor/Alumno: pool.query(query, [userId])
@@ -743,7 +743,7 @@ router.post('/encuestas', authenticateToken, async (req, res) => {
   }
 
   const { idCurso, titulo, descripcion, preguntas } = req.body;
-  
+
   if (!idCurso || !titulo || !preguntas || preguntas.length === 0) {
     return res.status(400).json({ error: "Faltan datos (idCurso, titulo, preguntas)" });
   }
@@ -762,7 +762,7 @@ router.post('/encuestas', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     // 1. Insertar la encuesta
     const encuestaRes = await client.query(
       `INSERT INTO encuestas (id_curso, creado_por, titulo, descripcion, estado)
@@ -770,15 +770,15 @@ router.post('/encuestas', authenticateToken, async (req, res) => {
        RETURNING id`,
       [idCurso, req.user.id, titulo, descripcion]
     );
-    
+
     const idEncuesta = encuestaRes.rows[0].id;
-    
+
     // 2. Insertar las preguntas
     const queryPreguntas = `
       INSERT INTO preguntas (id_encuesta, texto, tipo_pregunta, orden)
       VALUES ($1, $2, $3, $4)
     `;
-    
+
     for (let i = 0; i < preguntas.length; i++) {
       const p = preguntas[i];
       if (!p.texto || !p.tipo_pregunta) throw new Error("Pregunta inválida.");
@@ -787,7 +787,7 @@ router.post('/encuestas', authenticateToken, async (req, res) => {
 
     await client.query('COMMIT');
     res.status(201).json({ message: "Encuesta creada exitosamente", idEncuesta });
-    
+
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
@@ -831,7 +831,7 @@ router.get('/citas', authenticateToken, async (req, res) => {
 // Crear una nueva cita (buscando paciente por nombre)
 router.post('/citas/crear', authenticateToken, async (req, res) => {
   const psicologo_id = req.user.id;
-  
+
   // 1. Recibimos 'nombre_paciente' en lugar de 'paciente_id'
   const { nombre_paciente, titulo, start, end, notas } = req.body;
 
@@ -855,7 +855,7 @@ router.post('/citas/crear', authenticateToken, async (req, res) => {
     if (pacienteResult.rows.length === 0) {
       return res.status(404).json({ error: `Paciente (rol 2) con nombre "${nombre_paciente}" no encontrado.` });
     }
-    
+
     if (pacienteResult.rows.length > 1) {
       return res.status(400).json({ error: `Múltiples pacientes (rol 2) encontrados con el nombre "${nombre_paciente}". Por favor, sea más específico.` });
     }
@@ -870,13 +870,13 @@ router.post('/citas/crear', authenticateToken, async (req, res) => {
        RETURNING *, fecha_hora_inicio AS "start", fecha_hora_fin AS "end"`,
       [psicologo_id, paciente_id, titulo, start, end, notas]
     );
-    
+
     res.status(201).json({ message: "Cita creada con éxito 🚀", cita: result.rows[0] });
 
   } catch (err) {
     // Manejo de conflicto de horario (si las horas se superponen)
-    if (err.code === '23P01' || err.code === '40P01') { 
-        return res.status(409).json({ error: "El horario seleccionado ya está ocupado." });
+    if (err.code === '23P01' || err.code === '40P01') {
+      return res.status(409).json({ error: "El horario seleccionado ya está ocupado." });
     }
     console.error('Error al crear cita:', err);
     res.status(500).json({ error: 'Error interno al crear la cita' });
@@ -893,11 +893,11 @@ router.delete('/citas/:id', authenticateToken, async (req, res) => {
       'DELETE FROM citas WHERE id = $1 AND psicologo_id = $2 RETURNING *',
       [id, psicologo_id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Cita no encontrada o no pertenece a este psicólogo' });
     }
-    
+
     res.json({ message: 'Cita eliminada exitosamente' });
   } catch (err) {
     console.error('Error al eliminar cita:', err);

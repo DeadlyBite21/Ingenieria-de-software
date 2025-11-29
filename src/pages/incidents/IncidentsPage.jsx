@@ -1,7 +1,7 @@
 // src/pages/IncidentsPage.jsx
 import { useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '../utils/api';
-import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
 
 // --- Importaciones de React Bootstrap ---
@@ -15,20 +15,20 @@ import Badge from 'react-bootstrap/Badge';
 import { EyeFill, PencilSquare, PlusCircleFill } from 'react-bootstrap-icons';
 
 export default function IncidentsPage() {
-  const { user, isAdmin, isProfesor } = useAuth();
+  const { isAdmin, isProfesor } = useAuth();
   const [incidentes, setIncidentes] = useState([]);
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Estado para filtros
   const [filters, setFilters] = useState({ estado: '', idCurso: '' });
-  
+
   // Estado para paginación
-  const [pagination, setPagination] = useState({ 
-    page: 1, 
-    limit: 10, 
-    total: 0 
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0
   });
 
   // --- 1. Función para cargar los incidentes ---
@@ -47,7 +47,7 @@ export default function IncidentsPage() {
 
       // La API (backend/api.js) devuelve { data, total, page, limit }
       const response = await apiFetch(`/api/incidentes?${params.toString()}`);
-      
+
       setIncidentes(response.data);
       setPagination(prev => ({
         ...prev,
@@ -64,17 +64,17 @@ export default function IncidentsPage() {
 
   // Cargar lista de cursos para filtro
   useEffect(() => {
-  const loadCursos = async () => {
-    try {
-      // OJO: ajusta esta ruta al endpoint real de tu backend
-      const data = await apiFetch('/api/cursos');
-      setCursos(data); // asumiendo que viene como array [{ id, nombre, ... }]
-    } catch (err) {
-      console.error('Error al cargar cursos', err);
-    }
-  };
+    const loadCursos = async () => {
+      try {
+        // OJO: ajusta esta ruta al endpoint real de tu backend
+        const data = await apiFetch('/api/cursos');
+        setCursos(data); // asumiendo que viene como array [{ id, nombre, ... }]
+      } catch (err) {
+        console.error('Error al cargar cursos', err);
+      }
+    };
 
-  loadCursos();
+    loadCursos();
   }, []);
 
 
@@ -84,7 +84,7 @@ export default function IncidentsPage() {
   }, [loadIncidentes]); // Usamos la función memoizada
 
   // --- 3. Handlers para filtros y paginación ---
-  
+
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
@@ -96,7 +96,7 @@ export default function IncidentsPage() {
     setPagination(prev => ({ ...prev, page: 1 }));
     // loadIncidentes() se disparará por el cambio en 'page' si es necesario, 
     // pero lo llamamos explícitamente para asegurar la recarga con filtros.
-    loadIncidentes(); 
+    loadIncidentes();
   };
 
   const handleClearFilters = () => {
@@ -164,7 +164,7 @@ export default function IncidentsPage() {
               <div className="col-md-4">
                 <Form.Group controlId="filterEstado">
                   <Form.Label>Estado</Form.Label>
-                  <Form.Select 
+                  <Form.Select
                     name="estado"
                     value={filters.estado}
                     onChange={handleFilterChange}
@@ -246,7 +246,7 @@ export default function IncidentsPage() {
               </tbody>
             </Table>
           </Card>
-          
+
           {/* Paginación simple */}
           {pagination.total > 0 && (
             <div className="d-flex justify-content-between align-items-center mt-3">
@@ -254,7 +254,7 @@ export default function IncidentsPage() {
                 Mostrando {incidentes.length} de {pagination.total} incidentes
               </span>
               <div className="d-flex gap-2">
-                <Button 
+                <Button
                   onClick={() => handlePageChange(pagination.page - 1)}
                   disabled={pagination.page <= 1}
                   variant="outline-secondary"
@@ -264,7 +264,7 @@ export default function IncidentsPage() {
                 <span className="align-self-center px-2">
                   Página {pagination.page} de {totalPages}
                 </span>
-                <Button 
+                <Button
                   onClick={() => handlePageChange(pagination.page + 1)}
                   disabled={pagination.page >= totalPages}
                   variant="outline-secondary"
