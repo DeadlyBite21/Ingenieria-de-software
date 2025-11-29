@@ -10,7 +10,8 @@ import {
   Form,
   FloatingLabel,
   Toast,
-  ToastContainer
+  ToastContainer,
+  Table // Importamos Table para la lista
 } from 'react-bootstrap';
 
 // --- Importación de Iconos ---
@@ -20,9 +21,10 @@ import {
   JournalPlus,
   PersonAdd,
   Trash,
-  ExclamationTriangleFill, // Icono para la alerta de eliminar
-  CheckCircleFill,         // Icono para éxito
-  XCircleFill              // Icono para error
+  ExclamationTriangleFill,
+  CheckCircleFill,
+  XCircleFill,
+  Download // Icono para el botón de descargar CSV
 } from 'react-bootstrap-icons';
 
 export default function AdminDashboard() {
@@ -35,13 +37,18 @@ export default function AdminDashboard() {
   // --- Estados de Modals (Formularios) ---
   const [showCreateCourse, setShowCreateCourse] = useState(false);
   const [showAssignUser, setShowAssignUser] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false); // Modal de confirmación
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // --- NUEVO ESTADO: Modal de Lista de Usuarios ---
+  const [showUserListModal, setShowUserListModal] = useState(false);
+  const [currentCourseUsers, setCurrentCourseUsers] = useState([]); // Lista filtrada y ordenada
+  const [currentCourseName, setCurrentCourseName] = useState('');   // Nombre para el título y el CSV
 
   // --- Estados de Datos de Formularios ---
   const [newCourse, setNewCourse] = useState({ nombre: '' });
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedUser, setSelectedUser] = useState('');
-  const [courseToDelete, setCourseToDelete] = useState(null); // Curso seleccionado para borrar
+  const [courseToDelete, setCourseToDelete] = useState(null);
 
   const [courseUsers, setCourseUsers] = useState({});
   const [incidentCounts, setIncidentCounts] = useState({});
@@ -50,14 +57,13 @@ export default function AdminDashboard() {
   const [toastConfig, setToastConfig] = useState({
     show: false,
     message: '',
-    variant: 'success' // 'success' (verde) o 'danger' (rojo)
+    variant: 'success'
   });
 
   useEffect(() => {
     loadData();
   }, []);
 
-  // Función auxiliar para mostrar notificaciones
   const showToast = (message, variant = 'success') => {
     setToastConfig({ show: true, message, variant });
   };
@@ -103,9 +109,9 @@ export default function AdminDashboard() {
       setNewCourse({ nombre: '' });
       setShowCreateCourse(false);
       loadData();
-      showToast('¡Curso creado con éxito!', 'success'); // Notificación Verde
+      showToast('¡Curso creado con éxito!', 'success');
     } catch (err) {
-      showToast('Error al crear curso: ' + err.message, 'danger'); // Notificación Roja
+      showToast('Error al crear curso: ' + err.message, 'danger');
     }
   };
 
@@ -123,16 +129,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // 1. Paso previo: Abrir modal de confirmación
   const requestDeleteCourse = (curso) => {
     setCourseToDelete(curso);
     setShowDeleteModal(true);
   };
 
-  // 2. Acción real: Eliminar tras confirmar
   const confirmDeleteCourse = async () => {
     if (!courseToDelete) return;
-
     try {
       await apiFetch(`/api/cursos/${courseToDelete.id}`, { method: 'DELETE' });
       loadData();
@@ -145,12 +148,62 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- NUEVA LÓGICA: Abrir Modal de Lista ---
+  const handleOpenUserList = (cursoId, cursoNombre) => {
+    const users = courseUsers[cursoId] || [];
+
+    // Ordenar: Profesor (rol 1) primero, luego alfabético
+    const sortedUsers = [...users].sort((a, b) => {
+      // Si a es profe y b no, a va antes (-1)
+      if (a.rol === 1 && b.rol !== 1) return -1;
+      // Si b es profe y a no, b va antes (1)
+      if (a.rol !== 1 && b.rol === 1) return 1;
+      // Si ambos son iguales (alumnos), ordenar por nombre
+      return a.nombre.localeCompare(b.nombre);
+    });
+
+    setCurrentCourseUsers(sortedUsers);
+    setCurrentCourseName(cursoNombre);
+    setShowUserListModal(true);
+  };
+
+  // --- NUEVA LÓGICA: Descargar CSV ---
+  const handleDownloadCSV = () => {
+    // 1. Definir cabeceras
+    const headers = ['RUT,Nombre,Mail,Rol'];
+
+    // 2. Mapear datos
+    const rows = currentCourseUsers.map(u => {
+      let rolName = 'Otro';
+      if (u.rol === 0) rolName = 'Administrador';
+      if (u.rol === 1) rolName = 'Profesor';
+      if (u.rol === 2) rolName = 'Alumno';
+      if (u.rol === 3) rolName = 'Psicólogo';
+
+      // Envolver textos en comillas por si tienen comas
+      return `"${u.rut}","${u.nombre}","${u.correo}","${rolName}"`;
+    });
+
+    // 3. Unir todo con saltos de línea
+    const csvContent = "\uFEFF" + [headers, ...rows].join("\n"); // \uFEFF es el BOM para que Excel lea tildes
+
+    // 4. Crear blob y descargar
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Lista_${currentCourseName.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) return <div className="p-4 text-center">Cargando dashboard...</div>;
   if (error) return <div className="p-4 text-danger">Error crítico: {error}</div>;
 
   return (
     <div>
-      {/* --- Header Estilizado --- */}
+      {/* --- Header --- */}
       <div className="d-flex justify-content-between align-items-center mb-2">
         <h1 className="fw-bold m-0" style={{ fontFamily: 'sans-serif', fontSize: '2.5rem', letterSpacing: '-1px' }}>
           GESTIÓN DE CURSOS
@@ -164,7 +217,6 @@ export default function AdminDashboard() {
           >
             <JournalPlus size={20} /> Crear Curso
           </button>
-
           <button
             onClick={() => setShowAssignUser(true)}
             className="btn btn-outline-dark d-flex align-items-center gap-2 fw-bold"
@@ -197,7 +249,6 @@ export default function AdminDashboard() {
               boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
               transition: 'transform 0.2s'
             }}>
-              {/* Botón eliminar llama a la función de confirmación */}
               <button
                 onClick={() => requestDeleteCourse(curso)}
                 className="btn btn-sm btn-link text-white position-absolute top-0 end-0 m-2 p-0"
@@ -212,14 +263,26 @@ export default function AdminDashboard() {
               </h3>
 
               <div className="d-flex justify-content-center gap-4">
-                <div className="d-flex flex-column align-items-center">
-                  <div style={{
-                    width: '60px', height: '60px',
-                    backgroundColor: '#D9D9D9',
-                    borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#333', marginBottom: '5px'
-                  }}>
+                {/* ICONO DE PERSONAS CLICABLE */}
+                <div
+                  className="d-flex flex-column align-items-center"
+                  onClick={() => handleOpenUserList(curso.id, curso.nombre)}
+                  style={{ cursor: 'pointer' }}
+                  title="Ver lista de alumnos y profesor"
+                >
+                  <div
+                    className="icon-circle-hover" // Clase para efecto hover opcional
+                    style={{
+                      width: '60px', height: '60px',
+                      backgroundColor: '#D9D9D9',
+                      borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#333', marginBottom: '5px',
+                      transition: 'transform 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1.0)'}
+                  >
                     <People size={28} />
                   </div>
                   <span className="fw-bold fs-5">{totalAlumnos}</span>
@@ -296,7 +359,7 @@ export default function AdminDashboard() {
         </Form>
       </Modal>
 
-      {/* 3. MODAL DE CONFIRMACIÓN DE ELIMINAR (Nuevo) */}
+      {/* 3. Confirmar Eliminación */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered backdrop="static">
         <Modal.Header closeButton className="bg-danger text-white">
           <Modal.Title className="fw-bold d-flex align-items-center gap-2">
@@ -311,16 +374,69 @@ export default function AdminDashboard() {
           <p className="text-muted small">Esta acción no se puede deshacer.</p>
         </Modal.Body>
         <Modal.Footer className="justify-content-center">
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)} className="px-4">
-            Cancelar
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)} className="px-4">Cancelar</Button>
+          <Button variant="danger" onClick={confirmDeleteCourse} className="px-4">Sí, Eliminar</Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* 4. NUEVO MODAL: Lista de Alumnos */}
+      <Modal
+        show={showUserListModal}
+        onHide={() => setShowUserListModal(false)}
+        centered
+        size="lg" // Modal ancho
+        scrollable // Scroll interno si la lista es muy larga
+      >
+        <Modal.Header closeButton>
+          <Modal.Title className="fw-bold">Integrantes: {currentCourseName}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {currentCourseUsers.length === 0 ? (
+            <p className="text-center text-muted my-4">No hay usuarios asignados a este curso.</p>
+          ) : (
+            <Table striped hover responsive className="align-middle">
+              <thead className="table-light">
+                <tr>
+                  <th>Nombre</th>
+                  <th>RUT</th>
+                  <th>Correo</th>
+                  <th>Rol</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentCourseUsers.map(u => (
+                  <tr key={u.id} className={u.rol === 1 ? 'table-warning' : ''}> {/* Destacar profesor */}
+                    <td className="fw-500">{u.nombre}</td>
+                    <td>{u.rut}</td>
+                    <td>{u.correo}</td>
+                    <td>
+                      {u.rol === 1 ? (
+                        <span className="badge bg-warning text-dark">Profesor</span>
+                      ) : (
+                        <span className="badge bg-secondary">Alumno</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowUserListModal(false)}>
+            Cerrar
           </Button>
-          <Button variant="danger" onClick={confirmDeleteCourse} className="px-4">
-            Sí, Eliminar
+          <Button
+            variant="primary"
+            onClick={handleDownloadCSV}
+            disabled={currentCourseUsers.length === 0}
+          >
+            <Download className="me-2" /> Descargar CSV
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* ================= NOTIFICACIONES (TOASTS) ================= */}
+      {/* ================= TOASTS ================= */}
       <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 9999 }}>
         <Toast
           onClose={() => setToastConfig({ ...toastConfig, show: false })}
@@ -334,7 +450,7 @@ export default function AdminDashboard() {
             <strong className="me-auto">Sistema</strong>
             <small>Ahora</small>
           </Toast.Header>
-          <Toast.Body className={toastConfig.variant === 'dark' ? 'text-white' : 'text-white'}>
+          <Toast.Body className="text-white">
             {toastConfig.message}
           </Toast.Body>
         </Toast>
