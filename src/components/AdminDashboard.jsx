@@ -11,7 +11,7 @@ import {
   FloatingLabel,
   Toast,
   ToastContainer,
-  Table // Importamos Table para la lista
+  Table
 } from 'react-bootstrap';
 
 // --- Importación de Iconos ---
@@ -24,7 +24,7 @@ import {
   ExclamationTriangleFill,
   CheckCircleFill,
   XCircleFill,
-  Download // Icono para el botón de descargar CSV
+  Download
 } from 'react-bootstrap-icons';
 
 export default function AdminDashboard() {
@@ -34,26 +34,27 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // --- Estados de Modals (Formularios) ---
+  // --- Estados de Modals ---
   const [showCreateCourse, setShowCreateCourse] = useState(false);
   const [showAssignUser, setShowAssignUser] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-  // --- NUEVO ESTADO: Modal de Lista de Usuarios ---
   const [showUserListModal, setShowUserListModal] = useState(false);
-  const [currentCourseUsers, setCurrentCourseUsers] = useState([]); // Lista filtrada y ordenada
-  const [currentCourseName, setCurrentCourseName] = useState('');   // Nombre para el título y el CSV
 
-  // --- Estados de Datos de Formularios ---
+  // --- Estados de Datos ---
   const [newCourse, setNewCourse] = useState({ nombre: '' });
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedUser, setSelectedUser] = useState('');
   const [courseToDelete, setCourseToDelete] = useState(null);
 
+  // Datos de listas y conteos
   const [courseUsers, setCourseUsers] = useState({});
-  const [incidentCounts, setIncidentCounts] = useState({});
+  const [incidentCounts, setIncidentCounts] = useState({}); // Estado para el mock de incidentes
 
-  // --- Estado para Notificaciones (Toasts) ---
+  // Estados para el modal de lista
+  const [currentCourseUsers, setCurrentCourseUsers] = useState([]);
+  const [currentCourseName, setCurrentCourseName] = useState('');
+
+  // --- Toast ---
   const [toastConfig, setToastConfig] = useState({
     show: false,
     message: '',
@@ -62,6 +63,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showToast = (message, variant = 'success') => {
@@ -78,16 +80,22 @@ export default function AdminDashboard() {
       setCursos(cursosData);
 
       const courseUsersData = {};
-      const incidentMockData = {};
+      // Copiamos los incidentes actuales para no regenerarlos y causar "parpadeo" de números
+      const incidentMockData = { ...incidentCounts };
 
       for (const curso of cursosData) {
         try {
+          // Obtener usuarios reales del backend
           const users = await apiFetch(`/api/cursos/${curso.id}/usuarios`);
           courseUsersData[curso.id] = users;
         } catch (err) {
           courseUsersData[curso.id] = [];
         }
-        incidentMockData[curso.id] = Math.floor(Math.random() * 20) + 1;
+
+        // Generar número random SOLO si no existe ya para ese curso
+        if (!incidentMockData[curso.id]) {
+          incidentMockData[curso.id] = Math.floor(Math.random() * 20) + 1;
+        }
       }
       setCourseUsers(courseUsersData);
       setIncidentCounts(incidentMockData);
@@ -122,7 +130,7 @@ export default function AdminDashboard() {
       await apiFetch(`/api/cursos/${selectedCourse.id}/usuarios/${selectedUser}`, { method: 'POST' });
       setSelectedUser('');
       setShowAssignUser(false);
-      loadData();
+      loadData(); // Recargamos para actualizar el contador
       showToast('Usuario asignado correctamente', 'success');
     } catch (err) {
       showToast('Error al asignar: ' + err.message, 'danger');
@@ -148,17 +156,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- NUEVA LÓGICA: Abrir Modal de Lista ---
   const handleOpenUserList = (cursoId, cursoNombre) => {
     const users = courseUsers[cursoId] || [];
 
-    // Ordenar: Profesor (rol 1) primero, luego alfabético
+    // Ordenar: Profesor (1) primero, luego alfabético
     const sortedUsers = [...users].sort((a, b) => {
-      // Si a es profe y b no, a va antes (-1)
       if (a.rol === 1 && b.rol !== 1) return -1;
-      // Si b es profe y a no, b va antes (1)
       if (a.rol !== 1 && b.rol === 1) return 1;
-      // Si ambos son iguales (alumnos), ordenar por nombre
       return a.nombre.localeCompare(b.nombre);
     });
 
@@ -167,27 +171,18 @@ export default function AdminDashboard() {
     setShowUserListModal(true);
   };
 
-  // --- NUEVA LÓGICA: Descargar CSV ---
   const handleDownloadCSV = () => {
-    // 1. Definir cabeceras
     const headers = ['RUT,Nombre,Mail,Rol'];
-
-    // 2. Mapear datos
     const rows = currentCourseUsers.map(u => {
       let rolName = 'Otro';
       if (u.rol === 0) rolName = 'Administrador';
       if (u.rol === 1) rolName = 'Profesor';
       if (u.rol === 2) rolName = 'Alumno';
       if (u.rol === 3) rolName = 'Psicólogo';
-
-      // Envolver textos en comillas por si tienen comas
       return `"${u.rut}","${u.nombre}","${u.correo}","${rolName}"`;
     });
 
-    // 3. Unir todo con saltos de línea
-    const csvContent = "\uFEFF" + [headers, ...rows].join("\n"); // \uFEFF es el BOM para que Excel lea tildes
-
-    // 4. Crear blob y descargar
+    const csvContent = "\uFEFF" + [headers, ...rows].join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -236,7 +231,8 @@ export default function AdminDashboard() {
         gap: '1.5rem'
       }}>
         {cursos.map((curso) => {
-          const totalAlumnos = courseUsers[curso.id]?.filter(u => u.rol === 2).length || 0;
+          // CORRECCIÓN AQUI: Contamos todos los usuarios del array, no filtramos por rol de alumno.
+          const totalIntegrantes = courseUsers[curso.id]?.length || 0;
           const totalIncidentes = incidentCounts[curso.id] || 0;
 
           return (
@@ -263,15 +259,14 @@ export default function AdminDashboard() {
               </h3>
 
               <div className="d-flex justify-content-center gap-4">
-                {/* ICONO DE PERSONAS CLICABLE */}
+                {/* ICONO DE PERSONAS (TOTAL USUARIOS) */}
                 <div
                   className="d-flex flex-column align-items-center"
                   onClick={() => handleOpenUserList(curso.id, curso.nombre)}
                   style={{ cursor: 'pointer' }}
-                  title="Ver lista de alumnos y profesor"
+                  title="Ver lista de integrantes"
                 >
                   <div
-                    className="icon-circle-hover" // Clase para efecto hover opcional
                     style={{
                       width: '60px', height: '60px',
                       backgroundColor: '#D9D9D9',
@@ -285,7 +280,8 @@ export default function AdminDashboard() {
                   >
                     <People size={28} />
                   </div>
-                  <span className="fw-bold fs-5">{totalAlumnos}</span>
+                  {/* Mostramos el total de integrantes corregido */}
+                  <span className="fw-bold fs-5">{totalIntegrantes}</span>
                 </div>
 
                 <div className="d-flex flex-column align-items-center">
@@ -379,14 +375,8 @@ export default function AdminDashboard() {
         </Modal.Footer>
       </Modal>
 
-      {/* 4. NUEVO MODAL: Lista de Alumnos */}
-      <Modal
-        show={showUserListModal}
-        onHide={() => setShowUserListModal(false)}
-        centered
-        size="lg" // Modal ancho
-        scrollable // Scroll interno si la lista es muy larga
-      >
+      {/* 4. Lista de Alumnos (CSV) */}
+      <Modal show={showUserListModal} onHide={() => setShowUserListModal(false)} centered size="lg" scrollable>
         <Modal.Header closeButton>
           <Modal.Title className="fw-bold">Integrantes: {currentCourseName}</Modal.Title>
         </Modal.Header>
@@ -405,16 +395,12 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {currentCourseUsers.map(u => (
-                  <tr key={u.id} className={u.rol === 1 ? 'table-warning' : ''}> {/* Destacar profesor */}
+                  <tr key={u.id} className={u.rol === 1 ? 'table-warning' : ''}>
                     <td className="fw-500">{u.nombre}</td>
                     <td>{u.rut}</td>
                     <td>{u.correo}</td>
                     <td>
-                      {u.rol === 1 ? (
-                        <span className="badge bg-warning text-dark">Profesor</span>
-                      ) : (
-                        <span className="badge bg-secondary">Alumno</span>
-                      )}
+                      {u.rol === 1 ? <span className="badge bg-warning text-dark">Profesor</span> : <span className="badge bg-secondary">Alumno</span>}
                     </td>
                   </tr>
                 ))}
@@ -423,20 +409,14 @@ export default function AdminDashboard() {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowUserListModal(false)}>
-            Cerrar
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleDownloadCSV}
-            disabled={currentCourseUsers.length === 0}
-          >
+          <Button variant="secondary" onClick={() => setShowUserListModal(false)}>Cerrar</Button>
+          <Button variant="primary" onClick={handleDownloadCSV} disabled={currentCourseUsers.length === 0}>
             <Download className="me-2" /> Descargar CSV
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* ================= TOASTS ================= */}
+      {/* --- TOASTS --- */}
       <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 9999 }}>
         <Toast
           onClose={() => setToastConfig({ ...toastConfig, show: false })}
