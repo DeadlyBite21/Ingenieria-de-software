@@ -211,3 +211,60 @@ body.dashboard-active {
   padding: 2.5rem;
   width: calc(100% - var(--sidebar-width));
 }
+
+/* --- Sidebar Container --- */
+.sidebar {
+  width: var(--sidebar-width);
+
+  /* CAMBIO AQUI: Nuevo Gradiente */
+  background: linear-gradient(135deg, #067892 0%, #5555b7 50%, #03102f 100%);
+
+  color: var(--text-muted);
+  /* Puedes cambiar esto a white si el texto se ve oscuro */
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  border-right: none;
+  /* Quitamos el borde para que se vea más limpio con el gradiente */
+  z-index: 1000;
+}
+
+/* Ajuste para que el texto se lea bien sobre el gradiente oscuro */
+.sidebar .app-logo,
+.sidebar .app-name,
+.sidebar-link,
+.menu-label {
+  color: rgba(255, 255, 255, 0.9);
+  /* Blanco casi puro */
+}
+
+.sidebar-link:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  /* Hover más suave */
+  color: #ffffff;
+}
+
+/* El enlace activo ahora puede ser blanco sólido con fondo traslúcido */
+.sidebar-link.active {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+}
+
+.modal-backdrop {
+  /* 1. Aseguramos que el color base sea Negro Sólido */
+  --bs-backdrop-bg: #000000;
+
+  /* 2. Aumentamos la opacidad */
+  /* 0.5 es el defecto. 0.85 hará que el fondo sea muy oscuro */
+  --bs-backdrop-opacity: 0.85;
+
+  /* 3. El efecto Blur */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
