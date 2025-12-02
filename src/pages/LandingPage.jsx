@@ -8,15 +8,18 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 
-// Iconos
+// Iconos de Bootstrap (Quitamos ShieldCheck porque usaremos nuestro Logo)
 import { 
-  ShieldCheck, 
   ExclamationOctagonFill, 
   CalendarHeartFill, 
   ClipboardDataFill, 
   BoxArrowInRight 
 } from 'react-bootstrap-icons';
 
+// Importamos nuestro Logo personalizado
+import Logo from '../components/Logo';
+
+// Importamos los estilos
 import './LandingPage.css';
 
 export default function LandingPage() {
@@ -26,7 +29,9 @@ export default function LandingPage() {
       <Navbar className="landing-navbar" expand="lg" variant="dark">
         <Container>
           <Navbar.Brand as={Link} to="/" className="brand-logo">
-            <ShieldCheck size={30} /> Convivio
+            {/* Aquí usamos el componente Logo */}
+            <Logo size={45} /> 
+            <span className="ms-2">Convivio</span>
           </Navbar.Brand>
           <Nav className="ms-auto">
             <Button 
@@ -64,9 +69,13 @@ export default function LandingPage() {
                 </Button>
               </div>
             </Col>
+            
+            {/* Columna derecha para imagen o ilustración decorativa */}
             <Col lg={5} className="d-none d-lg-block text-center">
-              {/* Aquí podrías poner una imagen/vector SVG de una escuela o estudiantes */}
-              <div style={{ fontSize: '15rem', opacity: 0.8 }}>🏫</div>
+              {/* Usamos un emoji grande como placeholder, pero aquí iría una ilustración SVG */}
+              <div style={{ fontSize: '12rem', filter: 'drop-shadow(0 10px 10px rgba(0,0,0,0.3))' }}>
+                🏫
+              </div>
             </Col>
           </Row>
         </Container>
