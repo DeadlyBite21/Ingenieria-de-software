@@ -1,171 +1,267 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, momentLocalizer } from 'react-big-calendar';
-import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
-import moment from 'moment';
-import 'moment/locale/es';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
-import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { apiFetch } from '../../utils/api';
-import StudentPsychologistList from './StudentPsychologistList';
-import CreateAppointmentModal from '../citas/CreateAppointmentModal';
+import { Link } from 'react-router-dom';
 
-moment.locale('es');
-const localizer = momentLocalizer(moment);
-const DnDCalendar = withDragAndDrop(Calendar);
+// --- Imports para Calendario ---
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { es } from 'date-fns/locale';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+// --- Bootstrap ---
+import { Modal, Button, Card, Badge, Spinner } from 'react-bootstrap';
+import { CalendarEvent, Clock, Person, TextLeft, GeoAltFill, CheckCircleFill, CalendarRange, FileText } from 'react-bootstrap-icons';
+
+const locales = { 'es': es };
+const localizer = dateFnsLocalizer({
+    format,
+    parse,
+    startOfWeek,
+    getDay,
+    locales,
+});
+
+const messages = {
+    allDay: 'Todo el día',
+    previous: 'Anterior',
+    next: 'Siguiente',
+    today: 'Hoy',
+    month: 'Mes',
+    week: 'Semana',
+    day: 'Día',
+    agenda: 'Agenda',
+    date: 'Fecha',
+    time: 'Hora',
+    event: 'Cita',
+    noEventsInRange: 'No hay citas en este rango.',
+};
 
 export default function PsychologistDashboard() {
     const { user } = useAuth();
-    const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [eventos, setEventos] = useState([]);
 
-    // State for Drag & Drop Modal
+    // Modal
     const [showModal, setShowModal] = useState(false);
-    const [draggedStudent, setDraggedStudent] = useState(null);
-    const [dropSlot, setDropSlot] = useState(null);
-    const [creating, setCreating] = useState(false);
-
-    const fetchEvents = () => {
-        apiFetch("/api/citas")
-            .then((data) => {
-                const mappedEvents = data.map(cita => ({
-                    id: cita.id,
-                    title: `${cita.nombre_alumno || 'Alumno'} - ${cita.estado || 'Sin estado'}`,
-                    start: new Date(cita.fecha_hora),
-                    end: new Date(new Date(cita.fecha_hora).getTime() + 60 * 60 * 1000),
-                    resource: cita
-                }));
-                setEvents(mappedEvents);
-            })
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    };
+    const [selectedCita, setSelectedCita] = useState(null);
 
     useEffect(() => {
-        fetchEvents();
+        loadAgenda();
     }, []);
 
-    const onDropFromOutside = ({ start, end, allDay }) => {
-        if (draggedStudent) {
-            setDropSlot({ start, end });
-            setShowModal(true);
-        }
-    };
-
-    const handleConfirmAppointment = async ({ title, notes, start, end, studentId }) => {
-        setCreating(true);
+    const loadAgenda = async () => {
         try {
-            await apiFetch('/api/citas/crear', {
-                method: 'POST',
-                body: JSON.stringify({
-                    id_alumno: studentId,
-                    id_psicologo: user.id,
-                    fecha_hora_inicio: start,
-                    fecha_hora_fin: end,
-                    motivo: notes || title,
-                    password: '' // Psychologist creating appointment doesn't need student password
-                })
-            });
-            setShowModal(false);
-            setDraggedStudent(null);
-            fetchEvents(); // Refresh calendar
-            alert('Cita creada exitosamente');
-        } catch (error) {
-            console.error(error);
-            alert('Error al crear la cita: ' + error.message);
+            setLoading(true);
+            const data = await apiFetch('/api/citas');
+
+            // Transformar datos para BigCalendar
+            const citasFormateadas = data.map(cita => ({
+                ...cita,
+                title: `${cita.pacienteNombre || 'Alumno'}`,
+                start: new Date(cita.start),
+                end: new Date(cita.end),
+                resource: cita // Guardamos toda la info original aquí (incluido el estado)
+            }));
+
+            setEventos(citasFormateadas);
+        } catch (err) {
+            console.error(err);
+            setError(err.message);
         } finally {
-            setCreating(false);
+            setLoading(false);
         }
     };
 
+    // --- LÓGICA DE COLORES ---
+    // Verde si está confirmada, Gris si es solicitud/pendiente
     const eventStyleGetter = (event) => {
-        let backgroundColor = '#3174ad';
-        if (event.resource.estado === 'realizada' || event.resource.estado === 'cerrado') backgroundColor = '#28a745';
-        if (event.resource.estado === 'cancelada') backgroundColor = '#dc3545';
-        if (event.resource.estado === 'pendiente' || event.resource.estado === 'abiertos') backgroundColor = '#ffc107';
-        if (event.resource.estado === 'en progreso') backgroundColor = '#17a2b8';
+        const estado = event.resource.estado;
+        let backgroundColor = '#6c757d'; // GRIS por defecto
 
-        return {
-            style: {
-                backgroundColor,
-                borderRadius: '5px',
-                opacity: 0.8,
-                color: 'white',
-                border: '0px',
-                display: 'block'
-            }
+        if (estado === 'confirmada') {
+            backgroundColor = '#198754'; // VERDE
+        }
+
+        const style = {
+            backgroundColor: backgroundColor,
+            borderRadius: '6px',
+            opacity: 0.9,
+            color: 'white',
+            border: 'none',
+            display: 'block',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+            fontSize: '0.85rem',
+            padding: '4px 8px'
         };
+        return { style };
     };
+
+    const handleSelectEvent = (event) => {
+        setSelectedCita(event);
+        setShowModal(true);
+    };
+
+    // --- ACCIÓN CONFIRMAR ---
+    const handleConfirmarCita = async () => {
+        if (!selectedCita) return;
+        try {
+            // Llamada a la API PATCH
+            await apiFetch(`/api/citas/${selectedCita.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: 'confirmada' })
+            });
+
+            // Actualizar estado local para ver el cambio de color inmediatamente
+            setEventos(prev => prev.map(ev =>
+                ev.id === selectedCita.id
+                    ? { ...ev, resource: { ...ev.resource, estado: 'confirmada' } }
+                    : ev
+            ));
+
+            setShowModal(false);
+            alert("¡Cita confirmada exitosamente!");
+        } catch (err) {
+            alert("Error al confirmar: " + err.message);
+        }
+    };
+
+    // --- ACCIÓN REAGENDAR ---
+    const handleReagendarCita = () => {
+        // Aquí puedes implementar lógica adicional o redirigir a una página de edición
+        alert("Funcionalidad para reagendar (editar fecha/hora) en proceso.");
+    };
+
+    if (loading) return <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>;
+    if (error) return <div className="p-4 text-danger">Error: {error}</div>;
 
     return (
-        <div>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-                <h1 className="fw-bold m-0" style={{ fontFamily: 'sans-serif', fontSize: '2.5rem', letterSpacing: '-1px' }}>
-                    AGENDA SEMANAL
-                </h1>
+        <div className="fade-in">
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 className="fw-bold text-dark m-0" style={{ fontFamily: 'sans-serif' }}>AGENDA SEMANAL</h1>
+                    <p className="text-muted m-0">Hola {user?.nombre}, gestiona tus solicitudes.</p>
+                </div>
+                <Button variant="outline-primary" as={Link} to="/dashboard/citas/crear" className="fw-bold shadow-sm rounded-pill px-4">
+                    <CalendarEvent className="me-2" /> Agendar Cita
+                </Button>
             </div>
 
-            <hr style={{ borderTop: '4px solid black', opacity: 1, marginTop: '0', marginBottom: '2rem' }} />
+            <Card className="shadow border-0" style={{ borderRadius: '20px', overflow: 'hidden' }}>
+                <Card.Body className="p-4" style={{ height: '75vh', backgroundColor: '#ffffff' }}>
+                    <Calendar
+                        localizer={localizer}
+                        events={eventos}
+                        startAccessor="start"
+                        endAccessor="end"
+                        style={{ height: '100%', fontFamily: 'inherit', fontWeight: '500' }}
+                        messages={messages}
+                        culture='es'
+                        onSelectEvent={handleSelectEvent}
+                        eventPropGetter={eventStyleGetter}
+                        views={['month', 'week', 'day', 'agenda']}
+                        defaultView='week'
+                        min={new Date(0, 0, 0, 8, 0, 0)}
+                        max={new Date(0, 0, 0, 20, 0, 0)}
+                    />
+                </Card.Body>
+            </Card>
 
-            {/* Pass setDraggedStudent to capture the student being dragged */}
-            <StudentPsychologistList onDragStart={setDraggedStudent} />
+            {/* Modal de Detalle Actualizado */}
+            <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+                <Modal.Header closeButton style={{ background: '#f8f9fa', borderBottom: 'none' }}>
+                    <Modal.Title className="fw-bold text-primary d-flex align-items-center">
+                        <div className="bg-primary bg-opacity-10 p-2 rounded-circle me-2">
+                            <CalendarEvent size={20} />
+                        </div>
+                        Detalle de Cita
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="p-4 pt-2">
+                    {selectedCita && (
+                        <div className="d-flex flex-column gap-3">
 
-            <div style={{ height: '600px', backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                <DnDCalendar
-                    localizer={localizer}
-                    events={events}
-                    startAccessor="start"
-                    endAccessor="end"
-                    defaultView="week"
-                    views={['week', 'day', 'agenda']}
-                    step={30}
-                    timeslots={2}
-                    min={new Date(0, 0, 0, 8, 0, 0)}
-                    max={new Date(0, 0, 0, 19, 0, 0)}
-                    eventPropGetter={eventStyleGetter}
+                            {/* Título y Estado */}
+                            <div className="border-bottom pb-3 mb-2">
+                                <h4 className="fw-bold mb-1 text-dark">{selectedCita.titulo}</h4>
+                                {selectedCita.resource.estado === 'confirmada'
+                                    ? <Badge bg="success" className="me-2 px-3 py-2 rounded-pill">Confirmada</Badge>
+                                    : <Badge bg="secondary" className="me-2 px-3 py-2 rounded-pill">Solicitud Pendiente</Badge>
+                                }
+                                <span className="text-muted small ms-2">ID: {selectedCita.id}</span>
+                            </div>
 
-                    // Drag and Drop Props
-                    draggableAccessor={() => true} // Allow existing events to be dragged (optional)
-                    onDropFromOutside={onDropFromOutside}
-                    onDragOverFromOutside={(e) => e.preventDefault()} // Necessary to allow dropping
-                    dragFromOutsideItem={() => {
-                        return {
-                            title: draggedStudent ? draggedStudent.nombre : 'Nuevo Evento',
-                            duration: 60
-                        };
-                    }}
-                    resizable
-                    onEventDrop={({ event, start, end }) => {
-                        // Handle moving existing events if desired (future)
-                        console.log('Moved event', event, start, end);
-                    }}
+                            <div className="d-flex align-items-center p-3 bg-light rounded-3">
+                                <Person size={24} className="text-primary me-3" />
+                                <div>
+                                    <small className="text-uppercase fw-bold text-muted" style={{ fontSize: '0.65rem', letterSpacing: '1px' }}>ALUMNO</small>
+                                    <div className="fs-5 fw-bold text-dark">{selectedCita.pacienteNombre}</div>
+                                </div>
+                            </div>
 
-                    messages={{
-                        next: "Siguiente",
-                        previous: "Anterior",
-                        today: "Hoy",
-                        month: "Mes",
-                        week: "Semana",
-                        day: "Día",
-                        agenda: "Agenda",
-                        date: "Fecha",
-                        time: "Hora",
-                        event: "Evento",
-                        noEventsInRange: "No hay citas en este rango."
-                    }}
-                />
-            </div>
+                            <div className="d-flex align-items-center px-3">
+                                <Clock size={22} className="text-muted me-3" />
+                                <div>
+                                    <div className="fs-6 text-dark fw-medium">
+                                        {format(selectedCita.start, 'EEEE d MMMM', { locale: es })}
+                                    </div>
+                                    <div className="text-muted small">
+                                        {format(selectedCita.start, 'HH:mm')} - {format(selectedCita.end, 'HH:mm')} hrs
+                                    </div>
+                                </div>
+                            </div>
 
-            {/* Modal for creating appointment */}
-            <CreateAppointmentModal
-                show={showModal}
-                onHide={() => setShowModal(false)}
-                onConfirm={handleConfirmAppointment}
-                loading={creating}
-                student={draggedStudent}
-                start={dropSlot?.start}
-                end={dropSlot?.end}
-            />
+                            {selectedCita.lugar && (
+                                <div className="d-flex align-items-center px-3">
+                                    <GeoAltFill size={20} className="text-muted me-3" />
+                                    <span className="text-dark">{selectedCita.lugar}</span>
+                                </div>
+                            )}
+
+                            {selectedCita.notas && (
+                                <div className="mt-2">
+                                    <div className="d-flex align-items-center mb-2 text-secondary fw-bold small text-uppercase">
+                                        <TextLeft className="me-2" /> Motivo / Notas
+                                    </div>
+                                    <p className="mb-0 text-dark bg-light p-3 rounded-3 border-start border-4 border-primary" style={{ fontStyle: 'italic' }}>
+                                        "{selectedCita.notas}"
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </Modal.Body>
+
+                {/* --- FOOTER CON LOS 3 BOTONES --- */}
+                <Modal.Footer className="justify-content-between">
+                    <div className="d-flex gap-2 w-100">
+                        {/* Botón 1: Reagendar */}
+                        <Button variant="warning" onClick={handleReagendarCita} className="flex-fill text-white fw-bold">
+                            <CalendarRange className="me-2" /> Reagendar
+                        </Button>
+
+                        {/* Botón 2: Confirmar (Solo visible si NO está confirmada) */}
+                        {selectedCita?.resource.estado !== 'confirmada' && (
+                            <Button variant="success" onClick={handleConfirmarCita} className="flex-fill fw-bold">
+                                <CheckCircleFill className="me-2" /> Confirmar
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Botón 3: Ver Ficha (Abajo, ancho completo) */}
+                    {selectedCita && (
+                        <Button
+                            as={Link}
+                            to={`/dashboard/citas/${selectedCita.id}`}
+                            variant="outline-primary"
+                            className="w-100 mt-2 border-0"
+                        >
+                            <FileText className="me-2" /> Ver Ficha Completa
+                        </Button>
+                    )}
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 }

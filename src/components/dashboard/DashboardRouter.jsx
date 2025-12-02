@@ -1,8 +1,8 @@
-// src/components/DashboardRouter.jsx
-import { useAuth } from '../../context/AuthContext';
+// src/components/dashboard/DashboardRouter.jsx
+import { useAuth } from '../../context/AuthContext'; // <--- CORRECCIÓN: ../../
 import AdminDashboard from './AdminDashboard';
 import UserDashboard from './UserDashboard';
-import PsychologistDashboard from './PsychologistDashboard'; // Nuevo dashboard
+import PsychologistDashboard from './PsychologistDashboard'; // Asegúrate de tener este archivo en la misma carpeta
 import DashboardLayout from './DashboardLayout';
 
 export default function DashboardRouter() {
@@ -26,7 +26,7 @@ export default function DashboardRouter() {
     );
   }
 
-  // 3. Profesores (Rol 1) y Alumnos (Rol 2)
+  // 3. Profesor (1) y Alumno (2)
   return (
     <DashboardLayout>
       <UserDashboard />

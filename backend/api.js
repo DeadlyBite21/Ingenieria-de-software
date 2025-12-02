@@ -1010,49 +1010,7 @@ router.post('/citas/crear', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Error al crear la cita' });
   }
 });
-router.get('/citas/:id', authenticateToken, async (req, res) => {
-  const { id } = req.params;
 
-  try {
-    const result = await pool.query(
-      `SELECT 
-         c.id, 
-         c.titulo AS motivo,           -- Alias para que el front lo lea como "motivo"
-         c.fecha_hora_inicio AS fecha_hora, -- Alias para "fecha_hora"
-         c.fecha_hora_fin,
-         c.lugar,
-         c.estado,
-         c.notas,
-         pac.nombre AS nombre_alumno,
-         pac.rut AS rut_alumno,
-         psi.nombre AS nombre_profesor
-       FROM citas c
-       LEFT JOIN usuarios pac ON c.paciente_id = pac.id
-       LEFT JOIN usuarios psi ON c.psicologo_id = psi.id
-       WHERE c.id = $1`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Cita no encontrada' });
-    }
-
-    // Verificación de permisos (opcional pero recomendada)
-    const cita = result.rows[0];
-    const userId = req.user.id;
-    const userRol = req.user.rol;
-
-    // Solo el psicólogo de la cita, el paciente o el admin pueden verla
-    // (Aquí asumimos que si eres Rol 3 eres el psicólogo, Rol 2 paciente, Rol 0 admin)
-    // Puedes ajustar esta lógica si necesitas más restricción.
-
-    res.json(cita);
-
-  } catch (err) {
-    console.error('Error al obtener detalle de cita:', err);
-    res.status(500).json({ error: 'Error en el servidor' });
-  }
-});
 // Actualizar una cita (Confirmar, Reagendar, etc.)
 router.patch('/citas/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
