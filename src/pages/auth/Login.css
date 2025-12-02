@@ -2,12 +2,13 @@
 
 /* Fondo de la página (con tu imagen) */
 body.login-active {
-  background-image: url('../assets/login-background.jpg');
+  background-image: url('../../assets/login-background.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  background-color: #1a1a2e; /* Fallback oscuro */
+  background-color: #1a1a2e;
+  /* Fallback oscuro */
 }
 
 /* Contenedor para centrar el formulario */
@@ -24,17 +25,18 @@ body.login-active {
 .login-card-simple {
   max-width: 450px;
   width: 100%;
-  
+
   /* 1. Fondo oscuro semitransparente */
-  background-color: rgba(25, 20, 40, 0.75); /* Morado oscuro, 75% opacidad */
-  
+  background-color: rgba(25, 20, 40, 0.75);
+  /* Morado oscuro, 75% opacidad */
+
   /* 2. Efecto de desenfoque */
   -webkit-backdrop-filter: blur(15px);
   backdrop-filter: blur(15px);
-  
+
   /* 3. Borde claro sutil */
   border: 1px solid rgba(255, 255, 255, 0.15);
-  
+
   border-radius: 1.25rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
@@ -72,7 +74,8 @@ body.login-active {
 /* Inputs (oscuros, semitransparentes, con texto blanco) */
 .input-group .form-control {
   background-color: rgba(0, 0, 0, 0.25);
-  color: #ffffff; /* Color del texto que escribes */
+  color: #ffffff;
+  /* Color del texto que escribes */
   border-color: rgba(255, 255, 255, 0.2);
 }
 
@@ -85,7 +88,8 @@ body.login-active {
 .input-group .form-control:focus {
   background-color: rgba(0, 0, 0, 0.4);
   color: #ffffff;
-  border-color: #a0a0ff; /* Borde morado claro al seleccionar */
+  border-color: #a0a0ff;
+  /* Borde morado claro al seleccionar */
   box-shadow: 0 0 0 0.25rem rgba(160, 160, 255, 0.25);
 }
 
@@ -108,6 +112,7 @@ body.login-active {
   text-decoration: none;
   font-size: 0.9rem;
 }
+
 .custom-link-purple:hover {
   text-decoration: underline;
 }
@@ -115,9 +120,10 @@ body.login-active {
 /* --- NUEVO BOTÓN BLANCO --- */
 /* Botón de "Ingresar" (blanco sólido con texto oscuro) */
 .btn-custom-light {
-  background-color: #ffffff;
-  border-color: #ffffff;
-  color: #212529; /* Texto oscuro */
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-light);
+  /* Texto oscuro */
   padding: 0.75rem;
   font-size: 1.05rem;
   font-weight: 600;
@@ -125,9 +131,10 @@ body.login-active {
 }
 
 .btn-custom-light:hover {
-  background-color: #f0f0f0; /* Un poco más oscuro al pasar el mouse */
-  border-color: #f0f0f0;
-  color: #212529;
+  background-color: var(--color-secondary);
+  /* Un poco más oscuro al pasar el mouse */
+  border-color: var(--color-secondary);
+  color: var(--color-text-light);
 }
 
 .btn-custom-light:disabled {

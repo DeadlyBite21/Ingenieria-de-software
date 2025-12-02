@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../../utils/api';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
@@ -23,14 +23,14 @@ export default function CitasListPage() {
   }, []);
 
   const getEstadoBadge = (estado) => {
-    switch(estado) {
+    switch (estado) {
       case 'realizada': return 'success';
       case 'cancelada': return 'danger';
       default: return 'warning';
     }
   };
 
-  if (loading) return <div className="text-center p-5"><Spinner animation="border"/></div>;
+  if (loading) return <div className="text-center p-5"><Spinner animation="border" /></div>;
 
   return (
     <div>
@@ -62,8 +62,8 @@ export default function CitasListPage() {
               citas.map(cita => (
                 <tr key={cita.id}>
                   <td>
-                    {new Date(cita.fecha_hora).toLocaleDateString()}<br/>
-                    <small className="text-muted">{new Date(cita.fecha_hora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
+                    {new Date(cita.fecha_hora).toLocaleDateString()}<br />
+                    <small className="text-muted">{new Date(cita.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
                   </td>
                   <td>
                     {user.rol === 2 ? cita.nombre_profesor : cita.nombre_alumno}

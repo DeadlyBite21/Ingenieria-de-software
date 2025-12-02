@@ -1,8 +1,7 @@
 // src/pages/IncidentCreatePage.jsx
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../../utils/api';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 
 // Date picker
 import DatePicker from 'react-datepicker';
@@ -19,8 +18,8 @@ import { ArrowLeft } from 'react-bootstrap-icons';
 export default function IncidentCreatePage() {
   const { id } = useParams(); // Para saber si estamos editando
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
+
+
   const [formData, setFormData] = useState({
     idCurso: '',
     tipo: 'académico',
@@ -33,10 +32,10 @@ export default function IncidentCreatePage() {
 
   const [cursos, setCursos] = useState([]);
   const [alumnosDisponibles, setAlumnosDisponibles] = useState([]);
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const isEditing = Boolean(id);
 
   // Cargar cursos y alumnos disponibles para el formulario
@@ -136,7 +135,7 @@ export default function IncidentCreatePage() {
         : null
     };
 
-    
+
     // Validar descripción
     if (payload.descripcion.length < 10) {
       setError("La descripción debe tener al menos 10 caracteres.");
@@ -159,7 +158,7 @@ export default function IncidentCreatePage() {
           body: JSON.stringify(payload)
         });
       }
-      
+
       alert(`Incidente ${isEditing ? 'actualizado' : 'creado'} exitosamente.`);
       navigate('/dashboard/incidentes'); // Redirigir a la lista
 
@@ -168,7 +167,7 @@ export default function IncidentCreatePage() {
       setLoading(false);
     }
   };
-  
+
   if (loading && isEditing) {
     return <div className="text-center my-5"><Spinner animation="border" /></div>;
   }
@@ -179,7 +178,7 @@ export default function IncidentCreatePage() {
         <ArrowLeft className="me-2" />
         Volver a Incidentes
       </Link>
-      
+
       <Card>
         <Card.Header>
           <Card.Title as="h2" className="m-0">
@@ -209,13 +208,13 @@ export default function IncidentCreatePage() {
                   </Form.Select>
                 </Form.Group>
               </div>
-              
+
               {/* Tipo */}
               <div className="col-md-4">
                 <Form.Group controlId="tipo">
                   <Form.Label>Tipo de Incidente*</Form.Label>
-                  <Form.Select 
-                    name="tipo" 
+                  <Form.Select
+                    name="tipo"
                     value={formData.tipo}
                     onChange={handleChange}
                     required
@@ -233,8 +232,8 @@ export default function IncidentCreatePage() {
               <div className="col-md-4">
                 <Form.Group controlId="severidad">
                   <Form.Label>Severidad*</Form.Label>
-                  <Form.Select 
-                    name="severidad" 
+                  <Form.Select
+                    name="severidad"
                     value={formData.severidad}
                     onChange={handleChange}
                     required
@@ -271,8 +270,8 @@ export default function IncidentCreatePage() {
               <div className="col-md-12">
                 <Form.Group controlId="lugar">
                   <Form.Label>Lugar (Opcional)</Form.Label>
-                  <Form.Control 
-                    type="text" 
+                  <Form.Control
+                    type="text"
                     name="lugar"
                     placeholder="Ej: Sala 301, Patio central"
                     value={formData.lugar}
@@ -281,12 +280,12 @@ export default function IncidentCreatePage() {
                   />
                 </Form.Group>
               </div>
-              
+
               {/* Descripción */}
               <div className="col-md-12">
                 <Form.Group controlId="descripcion">
                   <Form.Label>Descripción*</Form.Label>
-                  <Form.Control 
+                  <Form.Control
                     as="textarea"
                     rows={4}
                     name="descripcion"
@@ -298,7 +297,7 @@ export default function IncidentCreatePage() {
                   />
                 </Form.Group>
               </div>
-              
+
               {/* Alumnos */}
               <div className="col-md-12">
                 <Form.Group controlId="alumnos">

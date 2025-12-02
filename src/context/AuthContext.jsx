@@ -1,4 +1,5 @@
 // src/context/AuthContext.jsx
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiFetch, loginUser } from '../utils/api';
 
@@ -38,17 +39,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (identificador, contrasena) => {
-    try {
-      const response = await loginUser(identificador, contrasena);
-      
-      // Guardar token y datos del usuario
-      localStorage.setItem('token', response.token);
-      setUser(response.usuario);
-      
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await loginUser(identificador, contrasena);
+
+    // Guardar token y datos del usuario
+    localStorage.setItem('token', response.token);
+    setUser(response.usuario);
+
+    return response;
   };
 
   const logout = () => {

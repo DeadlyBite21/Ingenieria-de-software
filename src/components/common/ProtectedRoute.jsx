@@ -1,15 +1,17 @@
-import { useAuth } from '../context/AuthContext';
+// src/components/ProtectedRoute.jsx
+import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
 export default function ProtectedRoute({ children, requiredRole = null }) {
   const { user, loading } = useAuth();
 
+  // Mostrar loading mientras se verifica la autenticación
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         minHeight: '100vh',
         fontSize: '1.2rem'
       }}>
@@ -18,37 +20,25 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
     );
   }
 
+  // Si no está autenticado, redirigir al login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // --- CORRECCIÓN AQUÍ ---
-  let tienePermiso = true;
-
-  if (requiredRole !== null) {
-    if (Array.isArray(requiredRole)) {
-      // Si es un array (ej: [0, 1]), verificamos si el rol del usuario está dentro
-      tienePermiso = requiredRole.includes(user.rol);
-    } else {
-      // Si es un valor único (ej: 0), comparamos directamente
-      tienePermiso = user.rol === requiredRole;
-    }
-  }
-
-  // Si no tiene permiso, mostramos la pantalla de acceso denegado
-  if (!tienePermiso) {
+  // Si se requiere un rol específico y el usuario no lo tiene
+  if (requiredRole !== null && user.rol !== requiredRole) {
     return (
-      <div style={{ 
-        display: 'flex', 
+      <div style={{
+        display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center', 
-        alignItems: 'center', 
+        justifyContent: 'center',
+        alignItems: 'center',
         minHeight: '100vh',
         backgroundColor: '#f8f9fa',
         textAlign: 'center',
         padding: '2rem'
       }}>
-        <div style={{ 
+        <div style={{
           backgroundColor: 'white',
           padding: '2rem',
           borderRadius: '8px',
@@ -78,5 +68,6 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
     );
   }
 
+  // Si todo está bien, mostrar el contenido
   return children;
 }

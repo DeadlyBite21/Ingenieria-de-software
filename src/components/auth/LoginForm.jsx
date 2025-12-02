@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 // --- Importaciones de React Bootstrap ---
@@ -19,7 +19,7 @@ function LoginForm() {
   const [contrasena, setContrasena] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -30,13 +30,14 @@ function LoginForm() {
     try {
       await login(identificador, contrasena);
       navigate("/dashboard");
-    } catch (err) {
-      
+    } catch (error) {
+      console.error(error);
+
       // --- ¡ESTE ES EL CAMBIO! ---
       // En lugar de mostrar el error del servidor (err.message),
       // mostramos el mensaje genérico que solicitaste.
       setError("RUT o Contraseña incorrecta, por favor inténtalo de nuevo");
-      
+
     } finally {
       setLoading(false);
     }
@@ -47,7 +48,7 @@ function LoginForm() {
     // Card simple y centrada (usa la clase de Login.css)
     <Card className="login-card-simple">
       <Card.Body>
-        
+
         {/* Icono y Título */}
         <div className="text-start mb-4">
           <HouseDoorFill className="login-icon" />

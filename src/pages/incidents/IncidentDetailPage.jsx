@@ -1,6 +1,6 @@
 // src/pages/IncidentDetailPage.jsx
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../../utils/api';
 import { useParams, Link } from 'react-router-dom';
 
 // --- Importaciones de React Bootstrap ---
@@ -30,53 +30,53 @@ export default function IncidentDetailPage() {
   }, [id]);
 
   useEffect(() => {
-  if (!incidente) return;
+    if (!incidente) return;
 
-  const loadRelated = async () => {
-    try {
-      // aquí usamos SOLO endpoints que sí existen en tu api.js
-      const [cursosData, usuariosData] = await Promise.all([
-        apiFetch('/api/cursos'),
-        apiFetch('/api/usuarios')
-      ]);
+    const loadRelated = async () => {
+      try {
+        // aquí usamos SOLO endpoints que sí existen en tu api.js
+        const [cursosData, usuariosData] = await Promise.all([
+          apiFetch('/api/cursos'),
+          apiFetch('/api/usuarios')
+        ]);
 
-      // ---- Curso ----
-      const cursoId = Number(incidente.id_curso);
-      const curso = cursosData.find(c => Number(c.id) === cursoId);
-      setCursoNombre(curso ? curso.nombre : `ID: ${incidente.id_curso}`);
+        // ---- Curso ----
+        const cursoId = Number(incidente.id_curso);
+        const curso = cursosData.find(c => Number(c.id) === cursoId);
+        setCursoNombre(curso ? curso.nombre : `ID: ${incidente.id_curso}`);
 
-      // ---- Usuario que reportó ----
-      const creadorId =
-        incidente.creado_por !== null && incidente.creado_por !== undefined
-          ? Number(incidente.creado_por)
+        // ---- Usuario que reportó ----
+        const creadorId =
+          incidente.creado_por !== null && incidente.creado_por !== undefined
+            ? Number(incidente.creado_por)
+            : null;
+
+        const creador = creadorId !== null
+          ? usuariosData.find(u => Number(u.id) === creadorId)
           : null;
 
-      const creador = creadorId !== null
-        ? usuariosData.find(u => Number(u.id) === creadorId)
-        : null;
+        if (creador) {
+          setReportadoPor(creador);
+        }
 
-      if (creador) {
-        setReportadoPor(creador);
+        // ---- Alumnos involucrados ----
+        const alumnosIds = Array.isArray(incidente.alumnos) ? incidente.alumnos : [];
+        const alumnosDet = alumnosIds.map(id => {
+          const u = usuariosData.find(user => user.id === id);
+          return {
+            id,
+            nombre: u ? u.nombre : `Usuario ID ${id}`,
+          };
+        });
+        setAlumnosDetalle(alumnosDet);
+
+      } catch (e) {
+        console.error('Error cargando datos relacionados', e);
       }
+    };
 
-      // ---- Alumnos involucrados ----
-      const alumnosIds = Array.isArray(incidente.alumnos) ? incidente.alumnos : [];
-      const alumnosDet = alumnosIds.map(id => {
-        const u = usuariosData.find(user => user.id === id);
-        return {
-          id,
-          nombre: u ? u.nombre : `Usuario ID ${id}`,
-        };
-      });
-      setAlumnosDetalle(alumnosDet);
-      
-    } catch (e) {
-      console.error('Error cargando datos relacionados', e);
-    }
-  };
-
-  loadRelated();
-}, [incidente]);
+    loadRelated();
+  }, [incidente]);
 
   const getStatusBadge = (estado) => {
     switch (estado) {
@@ -86,7 +86,7 @@ export default function IncidentDetailPage() {
       default: return 'secondary';
     }
   };
-  
+
   const renderAlumnos = (lista) => {
     if (!lista || lista.length === 0) {
       return <span className="text-muted">No aplica</span>;
@@ -127,11 +127,11 @@ export default function IncidentDetailPage() {
   if (loading) {
     return <div className="text-center my-5"><Spinner animation="border" /></div>;
   }
-  
+
   if (error) {
     return <Alert variant="danger">Error al cargar incidente: {error}</Alert>;
   }
-  
+
   if (!incidente) {
     return <Alert variant="warning">No se encontró el incidente.</Alert>;
   }

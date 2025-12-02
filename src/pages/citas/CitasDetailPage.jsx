@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../../utils/api';
 import { useParams, Link } from 'react-router-dom';
 import { Card, Button, Badge, ListGroup, Spinner, Alert } from 'react-bootstrap';
 import { ArrowLeft } from 'react-bootstrap-icons';
@@ -17,7 +17,7 @@ export default function CitasDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="text-center mt-5"><Spinner animation="border"/></div>;
+  if (loading) return <div className="text-center mt-5"><Spinner animation="border" /></div>;
   if (error) return <Alert variant="danger">{error}</Alert>;
   if (!cita) return <Alert variant="warning">Cita no encontrada</Alert>;
 
@@ -50,7 +50,7 @@ export default function CitasDetailPage() {
           </ListGroup.Item>
         </ListGroup>
         <Card.Footer className="text-muted">
-            Creado el: {new Date(cita.creado_en).toLocaleDateString()}
+          Creado el: {new Date(cita.creado_en).toLocaleDateString()}
         </Card.Footer>
       </Card>
     </div>

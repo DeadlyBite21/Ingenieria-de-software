@@ -1,5 +1,5 @@
 // src/components/DashboardRouter.jsx
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import AdminDashboard from './AdminDashboard';
 import UserDashboard from './UserDashboard';
 import DashboardLayout from './DashboardLayout'; // <-- 1. Importa el nuevo layout
@@ -11,7 +11,7 @@ export default function DashboardRouter() {
   if (user?.rol === 0) {
     return (
       <DashboardLayout>
-        <AdminDashboard /> 
+        <AdminDashboard />
       </DashboardLayout>
     );
   }

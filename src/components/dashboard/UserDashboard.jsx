@@ -1,7 +1,7 @@
 // src/components/UserDashboard.jsx
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../utils/api';
+import { useAuth } from '../../context/AuthContext';
+import { apiFetch } from '../../utils/api';
 import { Link } from 'react-router-dom';
 
 export default function UserDashboard() {
@@ -51,9 +51,9 @@ export default function UserDashboard() {
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h1>Mi Dashboard</h1>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           gap: '1rem',
           padding: '1rem',
           backgroundColor: '#f8f9fa',
@@ -84,9 +84,9 @@ export default function UserDashboard() {
       </div>
 
       {/* Estadísticas rápidas */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '1rem',
         marginBottom: '2rem'
       }}>
@@ -126,7 +126,7 @@ export default function UserDashboard() {
         <h2 style={{ marginBottom: '1rem' }}>
           {user?.rol === 1 ? 'Mis Cursos' : 'Cursos Disponibles'}
         </h2>
-        
+
         {cursos.length === 0 ? (
           <div style={{
             padding: '2rem',
@@ -138,17 +138,17 @@ export default function UserDashboard() {
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📚</div>
             <h3>No hay cursos {user?.rol === 1 ? 'asignados' : 'disponibles'}</h3>
             <p>
-              {user?.rol === 1 
+              {user?.rol === 1
                 ? 'Contacta al administrador para que te asigne cursos.'
                 : 'Contacta al administrador para inscribirte en cursos.'
               }
             </p>
           </div>
         ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
-            gap: '1rem' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '1rem'
           }}>
             {cursos.map((curso) => (
               <div key={curso.id} style={{
@@ -160,15 +160,15 @@ export default function UserDashboard() {
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 cursor: 'pointer'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-              }}>
-                
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                }}>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <h3 style={{ margin: 0, color: '#333', fontSize: '1.2rem' }}>
                     {curso.nombre}
@@ -186,15 +186,15 @@ export default function UserDashboard() {
                 </div>
 
                 <div style={{ marginBottom: '1rem', color: '#666', fontSize: '0.9rem' }}>
-                  {user?.rol === 1 
+                  {user?.rol === 1
                     ? 'Gestiona este curso y sus estudiantes'
                     : 'Accede al contenido y actividades del curso'
                   }
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <Link 
-                    to={`/dashboard/courses/${curso.id}`} 
+                  <Link
+                    to={`/dashboard/courses/${curso.id}`}
                     style={{
                       backgroundColor: getRolColor(),
                       color: 'white',

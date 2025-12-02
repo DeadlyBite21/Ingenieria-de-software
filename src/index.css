@@ -3,6 +3,15 @@
   line-height: 1.5;
   font-weight: 400;
 
+  /* New Color Palette (for buttons/accents) */
+  --color-primary: #4223D6;
+  --color-secondary: #321AB3;
+  --color-tertiary: #211190;
+  --color-bg-dark: #00004A;
+  --color-bg-light: #11096D;
+  --color-text-light: #ffffff;
+  --color-text-muted: #d0d0ff;
+
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
   background-color: #242424;
@@ -18,6 +27,7 @@ a {
   color: #646cff;
   text-decoration: inherit;
 }
+
 a:hover {
   color: #535bf2;
 }
@@ -32,6 +42,7 @@ body {
   /* El background-color de :root se aplicará por defecto, 
      pero nuestro Login.css lo sobrescribirá. */
 }
+
 /* --- FIN DE LA CORRECCIÓN --- */
 
 
@@ -51,9 +62,11 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
   border-color: #646cff;
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
@@ -64,9 +77,11 @@ button:focus-visible {
     color: #213547;
     background-color: #ffffff;
   }
+
   a:hover {
     color: #747bff;
   }
+
   button {
     background-color: #f9f9f9;
   }
