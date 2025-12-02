@@ -46,12 +46,13 @@ router.get("/", (req, res) => {
   res.send("API conectada a Neon");
 });
 
-// Login
+// Login con bloqueo de seguridad
 router.post("/login", async (req, res) => {
   const { identificador, contrasena } = req.body;
   if (!identificador || !contrasena) return res.status(400).json({ error: "Falta rut o contraseña" });
 
   try {
+    // 1. Buscar usuario
     const result = await pool.query(
       "SELECT * FROM usuarios WHERE rut::text = $1 OR correo = $1", 
       [identificador]
@@ -61,17 +62,60 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Usuario no encontrado" });
 
     const usuario = result.rows[0];
+
+    // 2. VERIFICAR SI ESTÁ BLOQUEADO
+    if (usuario.bloqueado_hasta) {
+        const ahora = new Date();
+        const bloqueo = new Date(usuario.bloqueado_hasta);
+        
+        if (ahora < bloqueo) {
+            // Calcular minutos restantes
+            const minutosRestantes = Math.ceil((bloqueo - ahora) / 60000);
+            return res.status(403).json({ 
+                error: `Cuenta bloqueada por demasiados intentos. Intente nuevamente en ${minutosRestantes} minutos.` 
+            });
+        } else {
+            // El tiempo ya pasó, reseteamos (opcionalmente aquí o al login exitoso)
+            // Dejamos que fluya, se reseteará si acierta la clave abajo.
+        }
+    }
+
+    // 3. Verificar Contraseña
     let validPassword = false;
-    // Usamos 'contrasena' para coincidir con la BD (basado en tu lógica de login)
     if (usuario.contrasena?.startsWith?.('$2b$')) {
-      // Si la contraseña SÍ es un hash, usa bcrypt
       validPassword = await bcrypt.compare(contrasena, usuario.contrasena);
     } else {
-      // Si es texto plano (tu caso), usa una comparación simple
       validPassword = String(usuario.contrasena).trim() === contrasena;
     }
 
-    if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
+    // 4. MANEJO DE INTENTOS
+    if (!validPassword) {
+        const nuevosIntentos = (usuario.intentos_fallidos || 0) + 1;
+        
+        if (nuevosIntentos >= 3) {
+            // BLOQUEAR POR 15 MINUTOS
+            const tiempoBloqueo = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+            await pool.query(
+                "UPDATE usuarios SET intentos_fallidos = $1, bloqueado_hasta = $2 WHERE id = $3",
+                [nuevosIntentos, tiempoBloqueo, usuario.id]
+            );
+            return res.status(403).json({ error: "Has excedido los 3 intentos. Cuenta bloqueada por 15 minutos." });
+        } else {
+            // SOLO SUMAR INTENTO
+            await pool.query(
+                "UPDATE usuarios SET intentos_fallidos = $1 WHERE id = $2",
+                [nuevosIntentos, usuario.id]
+            );
+            const restantes = 3 - nuevosIntentos;
+            return res.status(401).json({ error: `Contraseña incorrecta. Te quedan ${restantes} intentos.` });
+        }
+    }
+
+    // 5. ÉXITO: Resetear contadores
+    await pool.query(
+        "UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = $1",
+        [usuario.id]
+    );
 
     const token = jwt.sign(
       { id: usuario.id, rut: usuario.rut, rol: usuario.rol },
@@ -90,6 +134,7 @@ router.post("/login", async (req, res) => {
       },
       token,
     });
+
   } catch (err) {
     console.error("Error en login:", err);
     res.status(500).json({ error: "Error en el servidor" });
