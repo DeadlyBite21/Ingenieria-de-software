@@ -235,7 +235,7 @@ function App() {
           <Route
             path="/dashboard/encuestas/resultados/:id"
             element={
-              <ProtectedRoute requiredRole={[0, 1]}> {/* Solo Admin (0) y Profesor (1) */}
+              <ProtectedRoute requiredRole={[0, 1, 3]}> {/* Solo Admin (0) y Profesor (1) */}
                 <DashboardLayout>
                   <ResultadosEncuestaPage />
                 </DashboardLayout>
