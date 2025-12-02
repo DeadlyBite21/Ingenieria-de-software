@@ -1,4 +1,3 @@
-// src/pages/LandingPage.jsx
 import { Link } from 'react-router-dom';
 import Container from 'react-bootstrap/Container';
 import Navbar from 'react-bootstrap/Navbar';
@@ -8,7 +7,6 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 
-// Iconos de Bootstrap (Quitamos ShieldCheck porque usaremos nuestro Logo)
 import { 
   ExclamationOctagonFill, 
   CalendarHeartFill, 
@@ -16,20 +14,20 @@ import {
   BoxArrowInRight 
 } from 'react-bootstrap-icons';
 
-// Importamos nuestro Logo personalizado
+// IMPORTANTE: Ajusta esta ruta según donde creaste realmente el Logo
+// Opción A: Si está en src/components/Logo.jsx
 import Logo from '../components/Logo';
+// Opción B: Si está en src/components/common/Logo.jsx
+// import Logo from '../components/common/Logo';
 
-// Importamos los estilos
 import './LandingPage.css';
 
 export default function LandingPage() {
   return (
     <>
-      {/* --- NAVBAR --- */}
       <Navbar className="landing-navbar" expand="lg" variant="dark">
         <Container>
           <Navbar.Brand as={Link} to="/" className="brand-logo">
-            {/* Aquí usamos el componente Logo */}
             <Logo size={45} /> 
             <span className="ms-2">Convivio</span>
           </Navbar.Brand>
@@ -46,10 +44,9 @@ export default function LandingPage() {
         </Container>
       </Navbar>
 
-      {/* --- HERO SECTION --- */}
-      <section className="hero-section d-flex align-items-center">
+      <section className="hero-section">
         <Container>
-          <Row className="align-items-center">
+          <Row className="align-items-center" style={{ minHeight: '80vh' }}>
             <Col lg={7}>
               <h1 className="hero-title">
                 Gestión Escolar y Convivencia en un solo lugar
@@ -69,11 +66,8 @@ export default function LandingPage() {
                 </Button>
               </div>
             </Col>
-            
-            {/* Columna derecha para imagen o ilustración decorativa */}
-            <Col lg={5} className="d-none d-lg-block text-center">
-              {/* Usamos un emoji grande como placeholder, pero aquí iría una ilustración SVG */}
-              <div style={{ fontSize: '12rem', filter: 'drop-shadow(0 10px 10px rgba(0,0,0,0.3))' }}>
+            <Col lg={5} className="d-none d-lg-flex justify-content-center">
+              <div style={{ fontSize: '10rem', filter: 'drop-shadow(0 10px 10px rgba(0,0,0,0.3))' }}>
                 🏫
               </div>
             </Col>
@@ -81,7 +75,6 @@ export default function LandingPage() {
         </Container>
       </section>
 
-      {/* --- FEATURES SECTION --- */}
       <section className="features-section">
         <Container>
           <div className="text-center mb-5">
@@ -90,7 +83,6 @@ export default function LandingPage() {
           </div>
 
           <Row className="g-4">
-            {/* Feature 1: Incidentes */}
             <Col md={4}>
               <Card className="feature-card shadow-sm">
                 <div className="feature-icon-wrapper icon-incident">
@@ -98,12 +90,10 @@ export default function LandingPage() {
                 </div>
                 <Card.Title className="fw-bold">Reporte de Incidentes</Card.Title>
                 <Card.Text className="text-muted">
-                  Sistema seguro para reportar y gestionar incidentes académicos o de conducta, permitiendo un seguimiento transparente por parte de los encargados.
+                  Sistema seguro para reportar y gestionar incidentes académicos o de conducta.
                 </Card.Text>
               </Card>
             </Col>
-
-            {/* Feature 2: Citas */}
             <Col md={4}>
               <Card className="feature-card shadow-sm">
                 <div className="feature-icon-wrapper icon-dates">
@@ -111,12 +101,10 @@ export default function LandingPage() {
                 </div>
                 <Card.Title className="fw-bold">Apoyo Psicológico</Card.Title>
                 <Card.Text className="text-muted">
-                  Agenda digital integrada para que los estudiantes soliciten horas con el equipo de psicología y orientación de manera privada y sencilla.
+                  Agenda digital integrada para solicitar horas con psicología de manera privada.
                 </Card.Text>
               </Card>
             </Col>
-
-            {/* Feature 3: Encuestas */}
             <Col md={4}>
               <Card className="feature-card shadow-sm">
                 <div className="feature-icon-wrapper icon-surveys">
@@ -124,7 +112,7 @@ export default function LandingPage() {
                 </div>
                 <Card.Title className="fw-bold">Encuestas y Feedback</Card.Title>
                 <Card.Text className="text-muted">
-                  Herramientas para recolectar la opinión de la comunidad mediante encuestas dinámicas creadas por profesores y administradores.
+                  Herramientas para recolectar la opinión de la comunidad mediante encuestas.
                 </Card.Text>
               </Card>
             </Col>
@@ -132,11 +120,9 @@ export default function LandingPage() {
         </Container>
       </section>
 
-      {/* --- FOOTER --- */}
       <footer className="landing-footer">
         <Container>
           <p className="mb-0">© 2024 Convivio. Todos los derechos reservados.</p>
-          <small>Desarrollado para Ingeniería de Software</small>
         </Container>
       </footer>
     </>
