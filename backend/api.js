@@ -732,14 +732,13 @@ router.post("/reset-password", async (req, res) => {
 });
 
 // Listar todas las encuestas (para el usuario logueado)
-// Listar todas las encuestas (para el usuario logueado)
 router.get('/encuestas', authenticateToken, async (req, res) => {
   try {
     let query;
     // 1. INICIAMOS 'values' COMO UN ARRAY VACÍO
     const values = []; 
 
-    if (req.user.rol === 0) {
+    if (req.user.rol === 0 || req.user.rol === 3) {
       // Admin ve todas (Esta consulta no usa parámetros)
       query = `SELECT e.*, c.nombre as nombre_curso 
                FROM encuestas e

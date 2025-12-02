@@ -12,7 +12,7 @@ import Badge from 'react-bootstrap/Badge';
 import { PlusCircleFill, EyeFill } from 'react-bootstrap-icons';
 
 export default function EncuestasListPage() {
-  const { isAdmin, isProfesor } = useAuth();
+  const { isAdmin, isProfesor, isPsicologo } = useAuth();
   const [encuestas, setEncuestas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -71,7 +71,7 @@ export default function EncuestasListPage() {
                           </Badge>
                           
                           {/* --- LÓGICA DE ACCIÓN: PROFESOR VE RESULTADOS, ALUMNO RESPONDE --- */}
-                          {(isAdmin || isProfesor) ? (
+                          {(isAdmin || isProfesor || isPsicologo) ? (
                               // Profesor/Admin: Ver resultados
                               <Button 
                                   as={Link} // Cambiar a Link
