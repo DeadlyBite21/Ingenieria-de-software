@@ -1,63 +1,83 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import moment from 'moment';
+import 'moment/locale/es';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { apiFetch } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 
+moment.locale('es');
+const localizer = momentLocalizer(moment);
+
 export default function Dashboard() {
-  const { user, logout } = useAuth();
-  const [courses, setCourses] = useState([]);
+  const { user } = useAuth();
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
 
   useEffect(() => {
-    (async () => {
-      try {
-        const list = await apiFetch("/api/cursos");
-        setCourses(list);
-      } catch (e) {
-        setErr(e.message);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    apiFetch("/api/citas")
+      .then((data) => {
+        const mappedEvents = data.map(cita => ({
+          id: cita.id,
+          title: `${cita.nombre_alumno || 'Alumno'} - ${cita.estado}`,
+          start: new Date(cita.fecha_hora),
+          end: new Date(new Date(cita.fecha_hora).getTime() + 60 * 60 * 1000), // Asumimos 1 hora de duración
+          status: cita.estado,
+          resource: cita
+        }));
+        setEvents(mappedEvents);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ padding: 16 }}>Cargando…</div>;
-  if (err) return <div style={{ padding: 16, color: "tomato" }}>{err}</div>;
+  const eventStyleGetter = (event) => {
+    let backgroundColor = '#3174ad'; // Default (Azul)
+    if (event.status === 'realizada' || event.status === 'cerrado') backgroundColor = '#28a745'; // Verde
+    if (event.status === 'cancelada') backgroundColor = '#dc3545'; // Rojo
+    if (event.status === 'pendiente' || event.status === 'abiertos') backgroundColor = '#ffc107'; // Amarillo
+    if (event.status === 'en progreso') backgroundColor = '#17a2b8'; // Cyan
 
-  const rolLabel = user?.rol === 0 ? "Administrador" : user?.rol === 1 ? "Profesor" : "Alumno";
+    return {
+      style: {
+        backgroundColor,
+        borderRadius: '5px',
+        opacity: 0.8,
+        color: 'white',
+        border: '0px',
+        display: 'block'
+      }
+    };
+  };
+
+  if (loading) return <div className="p-4 text-center">Cargando calendario...</div>;
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1>Dashboard</h1>
-        <button onClick={logout} style={{ padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-          Cerrar Sesión
-        </button>
-      </div>
-      <p>
-        Hola <strong>{user?.nombre}</strong> — Rol: <em>{rolLabel}</em>
-      </p>
-
-      {courses.length === 0 ? (
-        <p>No tienes cursos asignados.</p>
-      ) : (
-        <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 12 }}>
-          {courses.map((c) => (
-            <li key={c.id} style={{ border: "1px solid #444", borderRadius: 12, padding: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <strong>{c.nombre}</strong>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>ID: {c.id}</div>
-                </div>
-                <Link to={`/dashboard/courses/${c.id}`} style={{ textDecoration: "none" }}>
-                  Ver curso →
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div style={{ height: '80vh', padding: '20px' }}>
+      <h1 className="mb-4 fw-bold" style={{ fontFamily: 'sans-serif' }}>Calendario Semanal</h1>
+      <Calendar
+        localizer={localizer}
+        events={events}
+        startAccessor="start"
+        endAccessor="end"
+        style={{ height: '100%', backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+        defaultView="week"
+        views={['month', 'week', 'day', 'agenda']}
+        eventPropGetter={eventStyleGetter}
+        messages={{
+          next: "Siguiente",
+          previous: "Anterior",
+          today: "Hoy",
+          month: "Mes",
+          week: "Semana",
+          day: "Día",
+          agenda: "Agenda",
+          date: "Fecha",
+          time: "Hora",
+          event: "Evento",
+          noEventsInRange: "No hay citas en este rango."
+        }}
+      />
     </div>
   );
 }

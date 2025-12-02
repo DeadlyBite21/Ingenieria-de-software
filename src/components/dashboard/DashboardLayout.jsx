@@ -74,10 +74,12 @@ export default function DashboardLayout({ children }) {
 
           <div className="menu-label">Aplicaciones</div>
 
-          <Link to="/dashboard/incidentes" className={`sidebar-link ${isActive('/dashboard/incidentes')}`}>
-            <ExclamationOctagon className="link-icon" />
-            <span>Incidentes</span>
-          </Link>
+          {user?.rol !== 2 && (
+            <Link to="/dashboard/incidentes" className={`sidebar-link ${isActive('/dashboard/incidentes')}`}>
+              <ExclamationOctagon className="link-icon" />
+              <span>Incidentes</span>
+            </Link>
+          )}
 
           <Link to="/dashboard/encuestas" className={`sidebar-link ${isActive('/dashboard/encuestas')}`}>
             <ClipboardCheck className="link-icon" />
