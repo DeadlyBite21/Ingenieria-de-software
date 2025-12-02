@@ -1,4 +1,4 @@
-// src/components/ProtectedRoute.jsx
+// src/components/common/ProtectedRoute.jsx
 import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
@@ -25,8 +25,22 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Si se requiere un rol específico y el usuario no lo tiene
-  if (requiredRole !== null && user.rol !== requiredRole) {
+  // --- CORRECCIÓN AQUÍ ---
+  // Verificamos permisos soportando tanto un solo rol como un array de roles
+  let tienePermiso = true;
+
+  if (requiredRole !== null) {
+    if (Array.isArray(requiredRole)) {
+      // Si es un array (ej: [0, 1, 3]), verificamos si el rol del usuario está incluido
+      tienePermiso = requiredRole.includes(user.rol);
+    } else {
+      // Si es un número único (ej: 0), verificamos igualdad estricta
+      tienePermiso = user.rol === requiredRole;
+    }
+  }
+
+  // Si no tiene permiso, mostramos la pantalla de Acceso Denegado
+  if (!tienePermiso) {
     return (
       <div style={{
         display: 'flex',

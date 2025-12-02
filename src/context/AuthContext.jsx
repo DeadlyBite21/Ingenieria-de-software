@@ -62,6 +62,7 @@ export const AuthProvider = ({ children }) => {
     isAdmin: user?.rol === 0,
     isProfesor: user?.rol === 1,
     isAlumno: user?.rol === 2,
+    isPsicologo: user?.rol === 3,
   };
 
   return (
