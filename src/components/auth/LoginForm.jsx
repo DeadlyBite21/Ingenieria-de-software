@@ -14,7 +14,6 @@ import Spinner from 'react-bootstrap/Spinner';
 import { HouseDoorFill, PersonVcard, LockFill } from 'react-bootstrap-icons';
 
 function LoginForm() {
-  // --- Tu lógica existente (no se toca) ---
   const [identificador, setIdentificador] = useState("");
   const [contrasena, setContrasena] = useState("");
   const [error, setError] = useState(null);
@@ -23,43 +22,55 @@ function LoginForm() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  // Función auxiliar para validar formato de email
+  const isValidEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+
+    // --- NUEVA VALIDACIÓN ---
+    // Si el identificador contiene '@', asumimos que es un correo y lo validamos
+    if (identificador.includes('@')) {
+      if (!isValidEmail(identificador)) {
+        setError("Por favor, ingresa un formato de correo válido (ej: usuario@dominio.com).");
+        return;
+      }
+    }
+    // ------------------------
+
     setLoading(true);
     try {
       await login(identificador, contrasena);
       navigate("/dashboard");
     } catch (error) {
       console.error(error);
-
-      // --- ¡ESTE ES EL CAMBIO! ---
-      // En lugar de mostrar el error del servidor (err.message),
-      // mostramos el mensaje genérico que solicitaste.
+      // Mensaje de error genérico para seguridad
       setError("RUT o Contraseña incorrecta, por favor inténtalo de nuevo");
-
     } finally {
       setLoading(false);
     }
   };
-  // --- Fin de la lógica ---
 
   return (
-    // Card simple y centrada (usa la clase de Login.css)
     <Card className="login-card-simple">
       <Card.Body>
 
-        {/* Icono y Título */}
-        <div className="text-start mb-4">
+        {/* CAMBIO DE VISUAL:
+           Cambiamos 'text-start' por 'text-center' para centrar
+           icono, título y subtítulo.
+        */}
+        <div className="text-center mb-4">
           <HouseDoorFill className="login-icon" />
           <h1 className="login-title">Bienvenido/a</h1>
           <p className="login-subtitle">Por favor ingresa tus datos.</p>
         </div>
 
-        {/* Formulario */}
         <Form onSubmit={handleSubmit} className="text-start">
 
-          {/* Campo RUT */}
+          {/* Campo RUT / Correo */}
           <Form.Group className="mb-3" controlId="formBasicRut">
             <Form.Label>RUT o Correo</Form.Label>
             <InputGroup>
@@ -69,6 +80,7 @@ function LoginForm() {
                 onChange={(e) => setIdentificador(e.target.value)}
                 required
                 disabled={loading}
+                placeholder="ej: 12345678-9 o correo@escuela.cl"
               />
               <InputGroup.Text>
                 <PersonVcard className="text-muted" />
@@ -93,12 +105,10 @@ function LoginForm() {
             </InputGroup>
           </Form.Group>
 
-          {/* Opciones (Remember me / Forgot password) */}
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <a href="/recover-password" className="custom-link-purple">Olvidaste la contraseña?</a>
+            <a href="/recover-password" className="custom-link-purple">¿Olvidaste la contraseña?</a>
           </div>
 
-          {/* Botón Login */}
           <div className="d-grid">
             <Button variant="light" type="submit" className="btn-custom-light" disabled={loading}>
               {loading ? (
@@ -112,7 +122,6 @@ function LoginForm() {
             </Button>
           </div>
 
-          {/* Mensaje de Error (ahora mostrará tu nuevo mensaje) */}
           {error && <Alert variant="danger" className="mt-4 text-center">{error}</Alert>}
 
         </Form>
