@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { apiFetch } from '../../utils/api';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+
+// --- Imports de Fecha ---
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+import { format } from 'date-fns'; // Importante para formatear sin cambiar zona horaria
 
 import { Button, Card, Table, Badge, Spinner, Toast, ToastContainer, Modal, Form, Row, Col } from 'react-bootstrap';
 import { EyeFill, CheckCircleFill, XCircleFill, CalendarEvent, ClockFill, SendFill } from 'react-bootstrap-icons';
@@ -19,6 +22,7 @@ function PsychologistAvailabilityGrid({ slots, loading, selectedSlot, onSelectSl
       <h5 className="fw-bold mb-3">3. Horarios Disponibles (40 min)</h5>
       <div className="d-flex flex-wrap gap-2">
         {slots.map((slot, idx) => {
+          // Mostramos la hora tal cual viene del backend (Wall Time)
           const horaInicio = new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const horaFin = new Date(slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -33,6 +37,9 @@ function PsychologistAvailabilityGrid({ slots, loading, selectedSlot, onSelectSl
             </Button>
           );
         })}
+      </div>
+      <div className="text-muted small mt-2">
+         * Horario de almuerzo (12:40 - 14:00) bloqueado.
       </div>
     </div>
   );
@@ -96,7 +103,10 @@ export default function CitasListPage() {
   const loadDisponibilidad = () => {
     setLoadingSlots(true);
     setSlots([]); // Limpiar anteriores
-    const fechaStr = selectedDate.toISOString().split('T')[0];
+    setSelectedSlot(null);
+    
+    // --- CORRECCIÓN 1: Usar date-fns format para evitar el salto de día por timezone ---
+    const fechaStr = format(selectedDate, 'yyyy-MM-dd');
 
     apiFetch(`/api/psicologos/${selectedPsicologo}/disponibilidad?fecha=${fechaStr}`)
       .then(data => setSlots(data))
@@ -107,8 +117,8 @@ export default function CitasListPage() {
   // Al hacer clic en un bloque de hora
   const handleSlotClick = (slot) => {
     setSelectedSlot(slot);
-    setMotivo(''); // Limpiar motivo anterior
-    setShowModal(true); // Abrir modal
+    setMotivo(''); 
+    setShowModal(true); 
   };
 
   // Enviar Cita
@@ -120,13 +130,19 @@ export default function CitasListPage() {
 
     setBookingLoading(true);
     try {
+      // --- CORRECCIÓN 2: Convertir String a Date Object para que JSON.stringify genere el UTC correcto ---
+      // El slot.start viene como "2025-12-03T09:40:00" (Local Wall Time)
+      // new Date() lo asume local, y al enviarlo se pasa a UTC correcto para la DB.
+      const startObj = new Date(selectedSlot.start);
+      const endObj = new Date(selectedSlot.end);
+
       await apiFetch('/api/citas/crear', {
         method: 'POST',
         body: JSON.stringify({
           psicologo_id: selectedPsicologo,
           titulo: 'Solicitud Alumno',
-          start: selectedSlot.start,
-          end: selectedSlot.end,
+          start: startObj, 
+          end: endObj,
           notas: motivo
         })
       });
@@ -136,7 +152,7 @@ export default function CitasListPage() {
       setSelectedSlot(null);
       setMotivo('');
       loadCitas();
-      loadDisponibilidad();
+      loadDisponibilidad(); // Recargar para quitar el slot tomado
     } catch (err) {
       showToast(err.message || 'Error al agendar cita', 'danger');
     } finally {
@@ -251,14 +267,14 @@ export default function CitasListPage() {
         </Table>
       </Card>
 
-      {/* --- MODAL ESPECÍFICO SOLICITADO --- */}
+      {/* --- MODAL DE SOLICITUD --- */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered backdrop="static">
         <Modal.Header closeButton className="bg-primary text-white">
           <Modal.Title>Solicitar Cita</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p className="mb-3">
-            Has seleccionado el horario: <strong>{selectedSlot && new Date(selectedSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
+            Horario seleccionado: <strong>{selectedSlot && new Date(selectedSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
           </p>
           <Form.Group>
             <Form.Label className="fw-bold">Cuéntanos brevemente qué te sucede:</Form.Label>
@@ -272,19 +288,16 @@ export default function CitasListPage() {
           </Form.Group>
         </Modal.Body>
         <Modal.Footer className="justify-content-between">
-          {/* BOTÓN ROJO: CANCELAR */}
           <Button variant="danger" onClick={() => setShowModal(false)}>
             Cancelar
           </Button>
-
-          {/* BOTÓN VERDE: ENVIAR */}
           <Button variant="success" onClick={handleBooking} disabled={bookingLoading}>
             {bookingLoading ? <Spinner size="sm" animation="border" /> : <><SendFill className="me-2" />Enviar Solicitud</>}
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* Toast de Notificaciones */}
+      {/* Toast */}
       <ToastContainer position="bottom-end" className="p-3">
         <Toast onClose={() => setToastConfig({ ...toastConfig, show: false })} show={toastConfig.show} delay={4000} autohide bg={toastConfig.variant}>
           <Toast.Header>
