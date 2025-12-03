@@ -5,32 +5,14 @@ import { useAuth } from '../../context/AuthContext';
 
 // --- Importaciones de React Bootstrap ---
 import {
-  Modal,
-  Button,
-  Table,
-  Form,
-  FloatingLabel,
-  Badge,
-  Toast,
-  ToastContainer,
-  Row,
-  Col,
-  Spinner,
-  Accordion
+  Modal, Button, Table, Form, FloatingLabel, Badge,
+  Toast, ToastContainer, Row, Col, Spinner, Accordion
 } from 'react-bootstrap';
 
 // --- Iconos ---
 import {
-  EyeFill,
-  PencilSquare,
-  PlusCircleFill,
-  FunnelFill,
-  ExclamationTriangleFill,
-  CheckCircleFill,
-  XCircleFill,
-  ClockHistory,
-  JournalPlus,
-  PersonFill
+  EyeFill, PencilSquare, PlusCircleFill, FunnelFill,
+  ClockHistory, JournalPlus
 } from 'react-bootstrap-icons';
 
 // --- Date Picker ---
@@ -38,7 +20,8 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
 export default function IncidentsPage() {
-  const { isAdmin, isProfesor } = useAuth();
+  // --- CAMBIO: Agregamos isPsicologo ---
+  const { isAdmin, isProfesor, isPsicologo } = useAuth();
   const [incidentes, setIncidentes] = useState([]);
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,15 +33,11 @@ export default function IncidentsPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   // --- Estados de Edición / Historial ---
-  const [isEditing, setIsEditing] = useState(false); // True si estamos en modo "Ver historial / Agregar suceso"
+  const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [selectedIncident, setSelectedIncident] = useState(null);
-
-  // Data del incidente original para mostrar en el acordeón
   const [originalIncidentData, setOriginalIncidentData] = useState(null);
-  // Controla si mostramos el formulario para agregar nuevo suceso
   const [showNewEventForm, setShowNewEventForm] = useState(false);
-
   const [detallesAlumnos, setDetallesAlumnos] = useState([]);
   const [loadingDetalles, setLoadingDetalles] = useState(false);
 
@@ -82,7 +61,6 @@ export default function IncidentsPage() {
   // --- Toast ---
   const [toastConfig, setToastConfig] = useState({ show: false, message: '', variant: 'success' });
 
-  // Cargar Incidentes
   const loadIncidentes = useCallback(async () => {
     setLoading(true);
     try {
@@ -138,10 +116,6 @@ export default function IncidentsPage() {
     setToastConfig({ show: true, message, variant });
   };
 
-  const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
-  };
-
   const fetchAlumnosDetalle = async (incident) => {
     setLoadingDetalles(true);
     setDetallesAlumnos([]);
@@ -160,37 +134,31 @@ export default function IncidentsPage() {
     }
   };
 
-  // --- Handlers de Apertura ---
-
-  // Abrir para CREAR nuevo incidente
   const handleOpenCreate = () => {
     setIsEditing(false);
     setEditingId(null);
     setOriginalIncidentData(null);
-    setShowNewEventForm(true); // Siempre visible al crear
+    setShowNewEventForm(true);
     setFormData({
       idCurso: '', tipo: 'académico', severidad: 'baja', estado: 'abierto', descripcion: '', lugar: '', alumnos: [], fechaHora: new Date()
     });
     setShowCreateModal(true);
   };
 
-  // Abrir para VER HISTORIAL / AGREGAR SUCESO
   const handleOpenEdit = (incidente) => {
     setIsEditing(true);
     setEditingId(incidente.id);
     setOriginalIncidentData(incidente);
-    setShowNewEventForm(false); // Oculto al inicio, muestra solo acordeón
-
-    // Pre-cargamos el form con la data actual para facilitar la "continuación"
+    setShowNewEventForm(false);
     setFormData({
       idCurso: incidente.id_curso,
-      tipo: incidente.tipo, // Mantiene el tipo anterior por defecto
-      severidad: incidente.severidad, // Mantiene severidad
-      estado: incidente.estado, // Mantiene estado
-      descripcion: '', // Descripción vacía para el nuevo suceso
+      tipo: incidente.tipo,
+      severidad: incidente.severidad,
+      estado: incidente.estado,
+      descripcion: '',
       lugar: incidente.lugar || '',
       alumnos: incidente.alumnos || [],
-      fechaHora: new Date() // Fecha actual para el nuevo suceso
+      fechaHora: new Date()
     });
     setShowCreateModal(true);
   };
@@ -220,10 +188,8 @@ export default function IncidentsPage() {
 
   const handleConfirmSubmit = async () => {
     setShowConfirmModal(false);
-
     try {
       if (isEditing) {
-        // --- MODO AGREGAR SUCESO (PATCH) ---
         const payloadUpdate = {
           nuevoSuceso: {
             descripcion: formData.descripcion,
@@ -234,15 +200,12 @@ export default function IncidentsPage() {
             fecha: formData.fechaHora ? formData.fechaHora.toISOString() : new Date().toISOString()
           }
         };
-
         await apiFetch(`/api/incidentes/${editingId}`, {
           method: 'PATCH',
           body: JSON.stringify(payloadUpdate)
         });
-        showToast('Nuevo suceso registrado en la bitácora', 'success');
-
+        showToast('Nuevo suceso registrado', 'success');
       } else {
-        // --- MODO CREAR (POST) ---
         const payloadCreate = {
           idCurso: parseInt(formData.idCurso),
           tipo: formData.tipo,
@@ -253,14 +216,12 @@ export default function IncidentsPage() {
           alumnos: (formData.alumnos || []).map(id => parseInt(id)),
           fecha: formData.fechaHora ? formData.fechaHora.toISOString() : null
         };
-
         await apiFetch('/api/incidentes', {
           method: 'POST',
           body: JSON.stringify(payloadCreate)
         });
         showToast('Incidente reportado exitosamente', 'success');
       }
-
       setShowCreateModal(false);
       loadIncidentes();
     } catch (err) {
@@ -291,7 +252,9 @@ export default function IncidentsPage() {
           <button onClick={() => setShowFilterModal(true)} className="btn btn-outline-dark d-flex align-items-center gap-2 fw-bold" style={{ borderRadius: '50px', padding: '0.5rem 1.2rem', borderWidth: '2px' }}>
             <FunnelFill size={18} /> Filtrar
           </button>
-          {(isAdmin || isProfesor) && (
+          
+          {/* --- CAMBIO: Incluimos isPsicologo en la condición --- */}
+          {(isAdmin || isProfesor || isPsicologo) && (
             <button onClick={handleOpenCreate} className="btn btn-outline-dark d-flex align-items-center gap-2 fw-bold" style={{ borderRadius: '50px', padding: '0.5rem 1.2rem', borderWidth: '2px' }}>
               <PlusCircleFill size={20} /> Reportar Incidente
             </button>
@@ -330,7 +293,8 @@ export default function IncidentsPage() {
                         <Button size="sm" className="me-2" style={btnNavyStyle} onClick={() => handleOpenDetail(inc)} title="Ver Detalle">
                           <EyeFill />
                         </Button>
-                        {(isAdmin || isProfesor) && (
+                        {/* --- CAMBIO: Permitir editar a Psicólogos también --- */}
+                        {(isAdmin || isProfesor || isPsicologo) && (
                           <Button size="sm" style={btnNavyStyle} onClick={() => handleOpenEdit(inc)} title="Ver Historial / Agregar">
                             <ClockHistory />
                           </Button>
@@ -346,17 +310,15 @@ export default function IncidentsPage() {
           </div>
           <div className="d-flex justify-content-between align-items-center mt-3">
             <span className="text-muted">Página {pagination.page} de {totalPages}</span>
-            {/* Paginación simplificada para brevedad */}
           </div>
         </>
       )}
 
-      {/* 1. Modal Filtros (Código igual) */}
+      {/* Modales (Filtros, Crear, Confirmar, Detalle) siguen igual... */}
       <Modal show={showFilterModal} onHide={() => setShowFilterModal(false)} centered>
         <Modal.Header closeButton><Modal.Title>Filtrar Incidentes</Modal.Title></Modal.Header>
         <Modal.Body>
           <Form>
-            {/* ...Selectores de filtro... */}
             <FloatingLabel controlId="filterEstado" label="Estado" className="mb-3">
               <Form.Select value={filters.estado} onChange={(e) => setFilters({ ...filters, estado: e.target.value })}>
                 <option value="">Todos</option>
@@ -364,6 +326,7 @@ export default function IncidentsPage() {
                 <option value="cerrado">Cerrado</option>
               </Form.Select>
             </FloatingLabel>
+            {/* Filtro de Curso (Opcional) */}
           </Form>
         </Modal.Body>
         <Modal.Footer>
@@ -371,7 +334,7 @@ export default function IncidentsPage() {
         </Modal.Footer>
       </Modal>
 
-      {/* 2. MODAL GESTIÓN (Crear / Ver Historial / Agregar Suceso) */}
+      {/* MODAL GESTIÓN (Crear / Ver Historial) */}
       <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} centered backdrop="static" size="lg">
         <Modal.Header closeButton className="bg-light">
           <Modal.Title className="fw-bold">
@@ -381,14 +344,10 @@ export default function IncidentsPage() {
 
         <Form onSubmit={handlePreSubmit}>
           <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-
-            {/* --- SECCIÓN HISTORIAL (ACORDEÓN) --- */}
             {isEditing && originalIncidentData && (
               <div className="mb-4">
                 <h5 className="mb-3 text-muted"><ClockHistory className="me-2" />Línea de Tiempo</h5>
                 <Accordion defaultActiveKey={['0']} alwaysOpen>
-
-                  {/* Reporte Original (Siempre al final o principio según gusto, aquí lo ponemos primero) */}
                   <Accordion.Item eventKey="0">
                     <Accordion.Header>
                       <strong>Reporte Original - {new Date(originalIncidentData.fecha).toLocaleString()}</strong>
@@ -405,7 +364,6 @@ export default function IncidentsPage() {
                     </Accordion.Body>
                   </Accordion.Item>
 
-                  {/* Historial de Actualizaciones (Si existen) */}
                   {originalIncidentData.historial && originalIncidentData.historial.map((suceso, idx) => (
                     <Accordion.Item eventKey={String(idx + 1)} key={idx}>
                       <Accordion.Header>
@@ -413,7 +371,6 @@ export default function IncidentsPage() {
                         <Badge bg={getStatusBadge(suceso.estado)} className="ms-2">{suceso.estado}</Badge>
                       </Accordion.Header>
                       <Accordion.Body className="bg-light">
-                        <p className="small text-muted mb-1">Reportado por: {suceso.reportado_por || 'Desconocido'}</p>
                         <div className="p-2 bg-white border rounded">
                           {suceso.descripcion}
                         </div>
@@ -424,7 +381,6 @@ export default function IncidentsPage() {
               </div>
             )}
 
-            {/* --- BOTÓN PARA MOSTRAR FORMULARIO (Solo en modo edición) --- */}
             {isEditing && !showNewEventForm && (
               <div className="text-center py-3 border-top">
                 <p className="text-muted">¿Deseas agregar una nueva actualización a este caso?</p>
@@ -434,13 +390,10 @@ export default function IncidentsPage() {
               </div>
             )}
 
-            {/* --- FORMULARIO (Visible si es Nuevo o si se activó "Agregar Suceso") --- */}
             {(showNewEventForm || !isEditing) && (
               <div className={`mt-3 ${isEditing ? 'border-top pt-3 animate-fade-in' : ''}`}>
                 {isEditing && <h5 className="text-primary mb-3">Nuevo Suceso / Actualización</h5>}
-
                 <Row className="g-3">
-                  {/* Curso solo editable al crear de cero */}
                   <Col md={6}>
                     <FloatingLabel controlId="idCurso" label="Curso">
                       <Form.Select name="idCurso" value={formData.idCurso} onChange={handleFormChange} disabled={isEditing} required>
@@ -449,7 +402,6 @@ export default function IncidentsPage() {
                       </Form.Select>
                     </FloatingLabel>
                   </Col>
-
                   <Col md={6}>
                     <FloatingLabel controlId="estado" label="Estado Actual">
                       <Form.Select name="estado" value={formData.estado} onChange={handleFormChange} required>
@@ -459,7 +411,6 @@ export default function IncidentsPage() {
                       </Form.Select>
                     </FloatingLabel>
                   </Col>
-
                   <Col md={6}>
                     <FloatingLabel controlId="tipo" label="Tipo">
                       <Form.Select name="tipo" value={formData.tipo} onChange={handleFormChange}>
@@ -469,9 +420,7 @@ export default function IncidentsPage() {
                       </Form.Select>
                     </FloatingLabel>
                   </Col>
-
                   <Col md={6}>
-                    {/* Fecha del nuevo suceso */}
                     <div className="form-floating h-100">
                       <DatePicker
                         selected={formData.fechaHora}
@@ -483,14 +432,11 @@ export default function IncidentsPage() {
                       <label style={{ opacity: 0.65, transform: 'scale(0.85) translateY(-0.5rem) translateX(0.15rem)', position: 'absolute', top: 0 }}>Fecha Suceso</label>
                     </div>
                   </Col>
-
                   <Col xs={12}>
                     <FloatingLabel controlId="descripcion" label={isEditing ? "Detalle de la actualización" : "Descripción del incidente"}>
                       <Form.Control as="textarea" name="descripcion" value={formData.descripcion} onChange={handleFormChange} style={{ height: '100px' }} required />
                     </FloatingLabel>
                   </Col>
-
-                  {/* Alumnos solo editable al crear de cero (para simplificar historial) */}
                   {!isEditing && (
                     <Col xs={12}>
                       <Form.Group>
@@ -504,10 +450,7 @@ export default function IncidentsPage() {
                 </Row>
               </div>
             )}
-
           </Modal.Body>
-
-          {/* Footer solo si hay formulario activo */}
           {(showNewEventForm || !isEditing) && (
             <Modal.Footer>
               <Button variant="outline-danger" onClick={() => setShowCreateModal(false)}>Cancelar</Button>
@@ -517,7 +460,6 @@ export default function IncidentsPage() {
         </Form>
       </Modal>
 
-      {/* 3. Confirmación */}
       <Modal show={showConfirmModal} onHide={() => setShowConfirmModal(false)} centered>
         <Modal.Header closeButton className="bg-primary text-white">
           <Modal.Title className="fw-bold">Confirmar</Modal.Title>
@@ -531,11 +473,9 @@ export default function IncidentsPage() {
         </Modal.Footer>
       </Modal>
 
-      {/* 4. Detalle (Solo lectura con nombres) */}
       <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} centered size="lg">
         <Modal.Header closeButton><Modal.Title>Detalle Completo</Modal.Title></Modal.Header>
         <Modal.Body>
-          {/* Reutilizamos lógica del historial aquí si quisiéramos, pero por ahora muestra el estado actual */}
           {selectedIncident && (
             <div className="p-2">
               <h5 className="text-primary mb-3">Estado Actual</h5>
@@ -545,7 +485,6 @@ export default function IncidentsPage() {
               {loadingDetalles ? <Spinner size="sm" /> : (
                 <ul>{detallesAlumnos.map(a => <li key={a.id}>{a.nombre} - {a.rut}</li>)}</ul>
               )}
-              {/* Aquí también podríamos pintar el historial si queremos ver todo en detalle */}
             </div>
           )}
         </Modal.Body>

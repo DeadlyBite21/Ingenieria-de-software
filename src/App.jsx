@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
@@ -8,6 +7,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/auth/Login';
 import DashboardRouter from './components/dashboard/DashboardRouter';
 import ProtectedRoute from './components/common/ProtectedRoute';
+
+// --- NUEVO IMPORT ---
+import LandingPage from './pages/LandingPage'; 
 
 import DashboardLayout from "./components/dashboard/DashboardLayout";
 import IncidentsPage from "./pages/incidents/IncidentsPage";
@@ -26,7 +28,6 @@ import ResultadosEncuestaPage from "./pages/ResultadosEncuestaPage";
 
 // El componente Home (demo de Vite) sigue igual
 function Home() {
-
   const [count, setCount] = useState(0);
 
   return (
@@ -68,13 +69,19 @@ function App() {
       <Router>
         <Routes>
           {/* RUTA PRINCIPAL: 
-            Redirige automáticamente a /login 
+              Muestra la Landing Page. 
+              Usamos PublicRoute para que si ya está logueado, vaya al Dashboard.
           */}
-          <Route path="/" element={<Navigate to="/login" />} />
+          <Route 
+            path="/" 
+            element={
+              <PublicRoute>
+                <LandingPage />
+              </PublicRoute>
+            } 
+          />
 
-          {/* RUTA DE LOGIN: 
-            Usa la nueva página de Login y la protege con PublicRoute 
-          */}
+          {/* RUTA DE LOGIN */}
           <Route
             path="/login"
             element={
@@ -84,7 +91,7 @@ function App() {
             }
           />
 
-          {/* --- RUTAS DE RECUPERACIÓN AÑADIDAS --- */}
+          {/* --- RUTAS DE RECUPERACIÓN --- */}
           <Route
             path="/recover-password"
             element={
@@ -115,7 +122,7 @@ function App() {
             }
           />
 
-          {/* --- NUEVA RUTA: GESTIÓN DE USUARIOS (Solo Admin) --- */}
+          {/* GESTIÓN DE USUARIOS (Solo Admin) */}
           <Route
             path="/dashboard/usuarios"
             element={
@@ -151,6 +158,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+          
+          {/* INCIDENTES */}
           <Route
             path="/dashboard/incidentes"
             element={
@@ -161,8 +170,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          {/* Crear Incidente */}
           <Route
             path="/dashboard/incidentes/crear"
             element={
@@ -173,8 +180,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          {/* Editar Incidente */}
           <Route
             path="/dashboard/incidentes/editar/:id"
             element={
@@ -185,8 +190,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          {/* Detalle de Incidente */}
           <Route
             path="/dashboard/incidentes/:id"
             element={
@@ -198,6 +201,7 @@ function App() {
             }
           />
 
+          {/* ENCUESTAS */}
           <Route
             path="/dashboard/encuestas"
             element={
@@ -208,7 +212,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/dashboard/encuestas/crear"
             element={
@@ -219,7 +222,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/dashboard/encuestas/responder/:id"
             element={
@@ -230,11 +232,10 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/dashboard/encuestas/resultados/:id"
             element={
-              <ProtectedRoute requiredRole={[0, 1]}> {/* Solo Admin (0) y Profesor (1) */}
+              <ProtectedRoute requiredRole={[0, 1, 3]}> {/* Solo Admin (0) y Profesor (1) */}
                 <DashboardLayout>
                   <ResultadosEncuestaPage />
                 </DashboardLayout>
@@ -242,6 +243,7 @@ function App() {
             }
           />
 
+          {/* CITAS */}
           <Route
             path="/dashboard/citas"
             element={

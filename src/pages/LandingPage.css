@@ -1,0 +1,139 @@
+/* src/pages/LandingPage.css */
+
+/* --- HERO SECTION (Pantalla Principal) --- */
+.hero-section {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: white;
+  /* CAMBIO CLAVE: min-height 100vh hace que ocupe toda la altura de la ventana */
+  min-height: 100vh; 
+  display: flex;         /* Usamos flexbox */
+  align-items: center;   /* Centramos verticalmente el contenido */
+  position: relative;
+  overflow: hidden;
+  padding-top: 80px;     /* Espacio para que el navbar no tape el texto */
+}
+
+/* Círculos decorativos de fondo */
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: -10%;
+  right: -5%;
+  width: 50vw;       /* Hacemos el tamaño relativo al ancho de pantalla */
+  height: 50vw;
+  max-width: 500px;  /* Pero con un límite máximo */
+  max-height: 500px;
+  background: rgba(111, 66, 193, 0.2); 
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 0;
+}
+
+.hero-section::after {
+  content: '';
+  position: absolute;
+  bottom: -5%;
+  left: -5%;
+  width: 40vw;
+  height: 40vw;
+  max-width: 400px;
+  max-height: 400px;
+  background: rgba(0, 123, 255, 0.15); 
+  border-radius: 50%;
+  filter: blur(60px);
+  z-index: 0;
+}
+
+/* Aseguramos que el contenido esté por encima del fondo */
+.hero-section .container {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-title {
+  font-size: clamp(2.5rem, 5vw, 4rem); /* Texto responsivo: se ajusta al tamaño de pantalla */
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  line-height: 1.2;
+  background: linear-gradient(to right, #ffffff, #a0a0ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-subtitle {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  color: #d1d1e0;
+  margin-bottom: 2.5rem;
+  max-width: 600px;
+}
+
+/* --- NAVBAR --- */
+.landing-navbar {
+  background-color: transparent !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100; /* Asegura que esté siempre encima */
+  padding: 1.5rem 0;
+}
+
+.brand-logo {
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: white !important;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+/* --- FEATURES SECTION (Tarjetas) --- */
+.features-section {
+  padding: 80px 0;
+  background-color: #f8f9fa;
+}
+
+.feature-card {
+  border: none;
+  border-radius: 15px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+  background: white;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Efecto hover suave */
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+.feature-icon-wrapper {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  font-size: 1.8rem;
+}
+
+.icon-incident { background-color: #ffe5e5; color: #dc3545; }
+.icon-dates { background-color: #e5f0ff; color: #007bff; }
+.icon-surveys { background-color: #e5ffec; color: #28a745; }
+
+/* --- FOOTER --- */
+.landing-footer {
+  background-color: #212529;
+  color: #adb5bd;
+  padding: 2rem 0;
+  text-align: center;
+  font-size: 0.9rem;
+}
