@@ -33,9 +33,10 @@ export default function UserDashboard() {
     switch (user?.rol) {
       case 1: return 'Profesor';
       case 2: return 'Alumno';
+      case 3: return 'Psicólogo';
       default: return 'Usuario';
     }
-  };
+};
 
   const getRolColor = () => {
     switch (user?.rol) {

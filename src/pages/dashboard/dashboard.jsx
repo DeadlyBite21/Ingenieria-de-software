@@ -25,7 +25,12 @@ export default function Dashboard() {
   if (loading) return <div style={{ padding: 16 }}>Cargando…</div>;
   if (err) return <div style={{ padding: 16, color: "tomato" }}>{err}</div>;
 
-  const rolLabel = user?.rol === 0 ? "Administrador" : user?.rol === 1 ? "Profesor" : "Alumno";
+  const rolLabel =
+    user?.rol === 0 ? "Administrador" :
+    user?.rol === 1 ? "Profesor" :
+    user?.rol === 3 ? "Psicólogo" :
+    "Desconocido";
+
 
   return (
     <div style={{ padding: 24 }}>
