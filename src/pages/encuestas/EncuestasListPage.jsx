@@ -1,4 +1,4 @@
-// src/pages/EncuestasListPage.jsx
+// src/pages/encuestas/EncuestasListPage.jsx
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../../utils/api';
 import { Link } from 'react-router-dom';
@@ -9,7 +9,7 @@ import Card from 'react-bootstrap/Card';
 import Alert from 'react-bootstrap/Alert';
 import Spinner from 'react-bootstrap/Spinner';
 import Badge from 'react-bootstrap/Badge';
-import { PlusCircleFill, EyeFill } from 'react-bootstrap-icons';
+import { PlusCircleFill, EyeFill, ClipboardCheck } from 'react-bootstrap-icons';
 
 export default function EncuestasListPage() {
   const { isAdmin, isProfesor, isPsicologo } = useAuth();
@@ -23,7 +23,6 @@ export default function EncuestasListPage() {
 
   const loadEncuestas = async () => {
     try {
-      // Este es el endpoint que creamos en api.js
       const data = await apiFetch('/api/encuestas');
       setEncuestas(data);
     } catch (err) {
@@ -34,63 +33,90 @@ export default function EncuestasListPage() {
   };
 
   return (
-    <div>
+    <div className="fade-in" style={{ fontFamily: 'sans-serif' }}>
+      {/* --- HEADER ESTILIZADO --- */}
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1>Gestión de Encuestas</h1>
+        <div>
+          <h1 className="fw-bold text-dark m-0" style={{ fontFamily: 'sans-serif', fontSize: '2.5rem', letterSpacing: '-1px' }}>
+            GESTIÓN DE ENCUESTAS
+          </h1>
+          <p className="text-muted m-0" style={{ fontFamily: 'sans-serif' }}>
+            Revisa y administra las encuestas disponibles.
+          </p>
+        </div>
+
         {(isAdmin || isProfesor) && (
-          <Button as={Link} to="/dashboard/encuestas/crear" variant="primary">
+          <Button as={Link} to="/dashboard/encuestas/crear" variant="primary" className="fw-bold shadow-sm rounded-pill px-4" style={{ fontFamily: 'sans-serif' }}>
             <PlusCircleFill className="me-2" />
             Crear Encuesta
           </Button>
         )}
       </div>
 
-      {loading && <div className="text-center my-5"><Spinner animation="border" /></div>}
-      {error && <Alert variant="danger">Error: {error}</Alert>}
+      <hr style={{ borderTop: '4px solid black', opacity: 1, marginTop: '0', marginBottom: '2rem' }} />
+
+      {loading && <div className="text-center my-5"><Spinner animation="border" variant="primary" /></div>}
+      {error && <Alert variant="danger" style={{ fontFamily: 'sans-serif' }}>Error: {error}</Alert>}
 
       {!loading && !error && (
-        <Card>
-          <Card.Header>{encuestas.length} Encuestas encontradas</Card.Header>
-          <Card.Body>
+        <Card className="shadow border-0" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+          <Card.Header className="bg-white border-bottom py-3 px-4">
+            <h5 className="fw-bold m-0 text-primary" style={{ fontFamily: 'sans-serif' }}>
+              <ClipboardCheck className="me-2" />
+              {encuestas.length} Encuestas encontradas
+            </h5>
+          </Card.Header>
+          <Card.Body className="p-0">
             {encuestas.length === 0 ? (
-              <p className="text-muted text-center">
-                {isProfesor ? "No has creado ninguna encuesta." : "No hay encuestas para mostrar."}
-              </p>
+              <div className="text-center py-5">
+                <p className="text-muted" style={{ fontFamily: 'sans-serif' }}>
+                  {isProfesor ? "No has creado ninguna encuesta." : "No hay encuestas para mostrar."}
+                </p>
+              </div>
             ) : (
-              encuestas.map(enc => (
-                  <div key={enc.id} className="d-flex justify-content-between align-items-center p-3 border rounded mb-2">
-                      <div>
-                          <h5 className="mb-0">{enc.titulo}</h5>
-                          <small className="text-muted">
-                              Curso: {enc.nombre_curso} (ID: {enc.id_curso})
-                          </small>
-                      </div>
-                      <div>
-                          <Badge bg={enc.estado === 'publicada' ? 'success' : 'secondary'} className="me-3">
-                              {enc.estado}
-                          </Badge>
-                          
-                          {/* --- LÓGICA DE ACCIÓN: PROFESOR VE RESULTADOS, ALUMNO RESPONDE --- */}
-                          {(isAdmin || isProfesor || isPsicologo) ? (
-                              // Profesor/Admin: Ver resultados
-                              <Button 
-                                  as={Link} // Cambiar a Link
-                                  to={`/dashboard/encuestas/resultados/${enc.id}`} // NUEVA RUTA
-                                  variant="outline-info" 
-                                  size="sm" 
-                                  className="ms-3"
-                              >
-                                  <EyeFill className="me-1" /> Ver Resultados
-                              </Button>
-                          ) : (
-                              // Alumno: Responder
-                              <Button as={Link} to={`/dashboard/encuestas/responder/${enc.id}`} variant="success" size="sm" className="ms-3">
-                                  Responder Encuesta
-                              </Button>
-                          )}  
-                      </div>
+              <div className="list-group list-group-flush">
+                {encuestas.map(enc => (
+                  <div key={enc.id} className="list-group-item p-4 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div>
+                      <h5 className="mb-1 fw-bold text-dark" style={{ fontFamily: 'sans-serif' }}>{enc.titulo}</h5>
+                      <p className="text-muted small mb-1" style={{ fontFamily: 'sans-serif' }}>
+                        Curso: <strong className="text-dark">{enc.nombre_curso}</strong> (ID: {enc.id_curso})
+                      </p>
+                    </div>
+
+                    <div className="d-flex align-items-center gap-3">
+                      <Badge bg={enc.estado === 'publicada' ? 'success' : 'secondary'} className="px-3 py-2 rounded-pill" style={{ fontFamily: 'sans-serif' }}>
+                        {enc.estado.toUpperCase()}
+                      </Badge>
+
+                      {/* --- LÓGICA DE ACCIÓN --- */}
+                      {(isAdmin || isProfesor || isPsicologo) ? (
+                        <Button
+                          as={Link}
+                          to={`/dashboard/encuestas/resultados/${enc.id}`}
+                          variant="outline-primary"
+                          size="sm"
+                          className="fw-bold rounded-pill px-3"
+                          style={{ fontFamily: 'sans-serif' }}
+                        >
+                          <EyeFill className="me-2" /> Ver Resultados
+                        </Button>
+                      ) : (
+                        <Button
+                          as={Link}
+                          to={`/dashboard/encuestas/responder/${enc.id}`}
+                          variant="success"
+                          size="sm"
+                          className="fw-bold rounded-pill px-3"
+                          style={{ fontFamily: 'sans-serif' }}
+                        >
+                          Responder Encuesta
+                        </Button>
+                      )}
+                    </div>
                   </div>
-              ))
+                ))}
+              </div>
             )}
           </Card.Body>
         </Card>

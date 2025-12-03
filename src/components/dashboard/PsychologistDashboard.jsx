@@ -80,7 +80,6 @@ export default function PsychologistDashboard() {
         const estado = event.resource.estado;
         let backgroundColor = '#6c757d'; // GRIS por defecto
 
-        // Aceptamos 'confirmada' o 'aceptado' para ponerlo en verde
         if (estado === 'confirmada' || estado === 'aceptado') {
             backgroundColor = '#198754'; // VERDE
         }
@@ -94,7 +93,8 @@ export default function PsychologistDashboard() {
             display: 'block',
             boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
             fontSize: '0.85rem',
-            padding: '4px 8px'
+            padding: '4px 8px',
+            fontFamily: 'sans-serif' // Aseguramos fuente en los eventos
         };
         return { style };
     };
@@ -108,13 +108,13 @@ export default function PsychologistDashboard() {
     const handleConfirmarCita = async () => {
         if (!selectedCita) return;
         try {
-            // 1. Llamada a la API PATCH para guardar en base de datos
+            // Llamada a la API PATCH
             await apiFetch(`/api/citas/${selectedCita.id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ estado: 'confirmada' })
             });
 
-            // 2. Actualizar estado local para ver el cambio de color inmediatamente (Gris -> Verde)
+            // Actualizar estado local para ver el cambio de color inmediatamente
             setEventos(prev => prev.map(ev =>
                 ev.id === selectedCita.id
                     ? { ...ev, resource: { ...ev.resource, estado: 'confirmada' } }
@@ -134,23 +134,24 @@ export default function PsychologistDashboard() {
     };
 
     if (loading) return <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>;
-    if (error) return <div className="p-4 text-danger">Error: {error}</div>;
+    if (error) return <div className="p-4 text-danger" style={{ fontFamily: 'sans-serif' }}>Error: {error}</div>;
 
     return (
-        <div className="fade-in">
-            {/* Header */}
+        <div className="fade-in" style={{ fontFamily: 'sans-serif' }}> {/* Aplicar a todo el contenedor */}
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h1 className="fw-bold text-dark m-0" style={{ fontFamily: 'sans-serif' }}>AGENDA SEMANAL</h1>
-                    <p className="text-muted m-0">Hola {user?.nombre}, gestiona tus solicitudes.</p>
+                    <h1 className="fw-bold text-dark m-0" style={{ fontFamily: 'sans-serif', letterSpacing: '-1px' }}>
+                        AGENDA SEMANAL
+                    </h1>
+                    <p className="text-muted m-0" style={{ fontFamily: 'sans-serif' }}>
+                        Hola {user?.nombre}, gestiona tus solicitudes.
+                    </p>
                 </div>
-                {/* Botón para crear cita manualmente si es necesario */}
-                <Button variant="outline-primary" as={Link} to="/dashboard/citas/crear" className="fw-bold shadow-sm rounded-pill px-4">
+                <Button variant="outline-primary" as={Link} to="/dashboard/citas/crear" className="fw-bold shadow-sm rounded-pill px-4" style={{ fontFamily: 'sans-serif' }}>
                     <CalendarEvent className="me-2" /> Agendar Cita
                 </Button>
             </div>
 
-            {/* Calendario */}
             <Card className="shadow border-0" style={{ borderRadius: '20px', overflow: 'hidden' }}>
                 <Card.Body className="p-4" style={{ height: '75vh', backgroundColor: '#ffffff' }}>
                     <Calendar
@@ -158,7 +159,7 @@ export default function PsychologistDashboard() {
                         events={eventos}
                         startAccessor="start"
                         endAccessor="end"
-                        style={{ height: '100%', fontFamily: 'inherit', fontWeight: '500' }}
+                        style={{ height: '100%', fontFamily: 'sans-serif', fontWeight: '500' }}
                         messages={messages}
                         culture='es'
                         onSelectEvent={handleSelectEvent}
@@ -171,10 +172,10 @@ export default function PsychologistDashboard() {
                 </Card.Body>
             </Card>
 
-            {/* Modal de Detalle / Confirmación */}
-            <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+            {/* Modal de Detalle Actualizado */}
+            <Modal show={showModal} onHide={() => setShowModal(false)} centered style={{ fontFamily: 'sans-serif' }}>
                 <Modal.Header closeButton style={{ background: '#f8f9fa', borderBottom: 'none' }}>
-                    <Modal.Title className="fw-bold text-primary d-flex align-items-center">
+                    <Modal.Title className="fw-bold text-primary d-flex align-items-center" style={{ fontFamily: 'sans-serif' }}>
                         <div className="bg-primary bg-opacity-10 p-2 rounded-circle me-2">
                             <CalendarEvent size={20} />
                         </div>
@@ -187,7 +188,7 @@ export default function PsychologistDashboard() {
 
                             {/* Título y Estado */}
                             <div className="border-bottom pb-3 mb-2">
-                                <h4 className="fw-bold mb-1 text-dark">{selectedCita.titulo}</h4>
+                                <h4 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'sans-serif' }}>{selectedCita.titulo}</h4>
                                 {selectedCita.resource.estado === 'confirmada'
                                     ? <Badge bg="success" className="me-2 px-3 py-2 rounded-pill">Confirmada</Badge>
                                     : <Badge bg="secondary" className="me-2 px-3 py-2 rounded-pill">Solicitud Pendiente</Badge>
@@ -195,23 +196,21 @@ export default function PsychologistDashboard() {
                                 <span className="text-muted small ms-2">ID: {selectedCita.id}</span>
                             </div>
 
-                            {/* Información del Alumno */}
                             <div className="d-flex align-items-center p-3 bg-light rounded-3">
                                 <Person size={24} className="text-primary me-3" />
                                 <div>
-                                    <small className="text-uppercase fw-bold text-muted" style={{ fontSize: '0.65rem', letterSpacing: '1px' }}>ALUMNO</small>
-                                    <div className="fs-5 fw-bold text-dark">{selectedCita.pacienteNombre}</div>
+                                    <small className="text-uppercase fw-bold text-muted" style={{ fontSize: '0.65rem', letterSpacing: '1px', fontFamily: 'sans-serif' }}>ALUMNO</small>
+                                    <div className="fs-5 fw-bold text-dark" style={{ fontFamily: 'sans-serif' }}>{selectedCita.pacienteNombre}</div>
                                 </div>
                             </div>
 
-                            {/* Fecha y Hora */}
                             <div className="d-flex align-items-center px-3">
                                 <Clock size={22} className="text-muted me-3" />
                                 <div>
-                                    <div className="fs-6 text-dark fw-medium">
+                                    <div className="fs-6 text-dark fw-medium" style={{ fontFamily: 'sans-serif' }}>
                                         {format(selectedCita.start, 'EEEE d MMMM', { locale: es })}
                                     </div>
-                                    <div className="text-muted small">
+                                    <div className="text-muted small" style={{ fontFamily: 'sans-serif' }}>
                                         {format(selectedCita.start, 'HH:mm')} - {format(selectedCita.end, 'HH:mm')} hrs
                                     </div>
                                 </div>
@@ -220,16 +219,16 @@ export default function PsychologistDashboard() {
                             {selectedCita.lugar && (
                                 <div className="d-flex align-items-center px-3">
                                     <GeoAltFill size={20} className="text-muted me-3" />
-                                    <span className="text-dark">{selectedCita.lugar}</span>
+                                    <span className="text-dark" style={{ fontFamily: 'sans-serif' }}>{selectedCita.lugar}</span>
                                 </div>
                             )}
 
                             {selectedCita.notas && (
                                 <div className="mt-2">
-                                    <div className="d-flex align-items-center mb-2 text-secondary fw-bold small text-uppercase">
+                                    <div className="d-flex align-items-center mb-2 text-secondary fw-bold small text-uppercase" style={{ fontFamily: 'sans-serif' }}>
                                         <TextLeft className="me-2" /> Motivo / Notas
                                     </div>
-                                    <p className="mb-0 text-dark bg-light p-3 rounded-3 border-start border-4 border-primary" style={{ fontStyle: 'italic' }}>
+                                    <p className="mb-0 text-dark bg-light p-3 rounded-3 border-start border-4 border-primary" style={{ fontStyle: 'italic', fontFamily: 'sans-serif' }}>
                                         "{selectedCita.notas}"
                                     </p>
                                 </div>
@@ -238,29 +237,30 @@ export default function PsychologistDashboard() {
                     )}
                 </Modal.Body>
 
-                {/* Footer con Botones */}
+                {/* --- FOOTER CON LOS 3 BOTONES --- */}
                 <Modal.Footer className="justify-content-between">
                     <div className="d-flex gap-2 w-100">
-                        {/* Botón Reagendar */}
-                        <Button variant="warning" onClick={handleReagendarCita} className="flex-fill text-white fw-bold">
+                        {/* Botón 1: Reagendar */}
+                        <Button variant="warning" onClick={handleReagendarCita} className="flex-fill text-white fw-bold" style={{ fontFamily: 'sans-serif' }}>
                             <CalendarRange className="me-2" /> Reagendar
                         </Button>
 
-                        {/* Botón Confirmar (Solo visible si NO está confirmada) */}
+                        {/* Botón 2: Confirmar (Solo visible si NO está confirmada) */}
                         {selectedCita?.resource.estado !== 'confirmada' && (
-                            <Button variant="success" onClick={handleConfirmarCita} className="flex-fill fw-bold">
+                            <Button variant="success" onClick={handleConfirmarCita} className="flex-fill fw-bold" style={{ fontFamily: 'sans-serif' }}>
                                 <CheckCircleFill className="me-2" /> Confirmar
                             </Button>
                         )}
                     </div>
 
-                    {/* Botón Ver Ficha Completa */}
+                    {/* Botón 3: Ver Ficha (Abajo, ancho completo) */}
                     {selectedCita && (
                         <Button
                             as={Link}
                             to={`/dashboard/citas/${selectedCita.id}`}
                             variant="outline-primary"
                             className="w-100 mt-2 border-0"
+                            style={{ fontFamily: 'sans-serif' }}
                         >
                             <FileText className="me-2" /> Ver Ficha Completa
                         </Button>
