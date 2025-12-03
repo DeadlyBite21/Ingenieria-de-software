@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { Link } from 'react-router-dom';
 
-// Imports de librerías
+// Calendario y Fechas
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -13,10 +13,10 @@ import "react-datepicker/dist/react-datepicker.css";
 
 // Componentes
 import PsychologistAvailabilityGrid from '../citas/PsychologistAvailabilityGrid';
-import { Modal, Button, Card, Badge, Spinner, Form } from 'react-bootstrap';
+import { Modal, Button, Card, Badge, Spinner, Form, Row, Col } from 'react-bootstrap';
 import { 
     CalendarEvent, Clock, Person, TextLeft, GeoAltFill, 
-    CheckCircleFill, CalendarRange, FileText, ArrowLeft 
+    CheckCircleFill, CalendarRange, FileText, ArrowLeft, PlusLg 
 } from 'react-bootstrap-icons';
 
 const locales = { 'es': es };
@@ -35,27 +35,42 @@ export default function PsychologistDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [eventos, setEventos] = useState([]);
+    const [students, setStudents] = useState([]); // Lista de alumnos para el select
 
-    // Estados
-    const [showModal, setShowModal] = useState(false);
+    // --- ESTADOS MODALES ---
+    const [showDetailModal, setShowDetailModal] = useState(false); // Ver/Reagendar
+    const [showCreateModal, setShowCreateModal] = useState(false); // Crear Nueva
+
+    // --- ESTADOS DETALLE / REAGENDAR ---
     const [selectedCita, setSelectedCita] = useState(null);
     const [isRescheduling, setIsRescheduling] = useState(false);
-    const [newDate, setNewDate] = useState(new Date());
+    
+    // --- ESTADOS COMUNES (Selección de fecha/hora) ---
+    const [targetDate, setTargetDate] = useState(new Date());
     const [slots, setSlots] = useState([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
-    const [newSelectedSlot, setNewSelectedSlot] = useState(null);
+    const [selectedSlot, setSelectedSlot] = useState(null);
 
-    useEffect(() => { loadAgenda(); }, []);
+    // --- ESTADOS SOLO PARA CREAR ---
+    const [newCitaData, setNewCitaData] = useState({ studentId: '', notes: '' });
+
 
     useEffect(() => {
-        if (isRescheduling && selectedCita) loadDisponibilidad();
-    }, [newDate, isRescheduling]);
+        loadAgenda();
+        loadStudents();
+    }, []);
+
+    // Cargar disponibilidad cuando cambia la fecha (para ambos modales)
+    useEffect(() => {
+        if ((showCreateModal || isRescheduling) && targetDate) {
+            loadDisponibilidad();
+        }
+    }, [targetDate, showCreateModal, isRescheduling]);
 
     const loadAgenda = async () => {
         try {
             setLoading(true);
             const data = await apiFetch('/api/citas');
-            // Convertimos las fechas de string a objetos Date para el calendario
             const citasFormateadas = data.map(cita => ({
                 ...cita,
                 title: `${cita.pacienteNombre || 'Alumno'}`,
@@ -67,13 +82,19 @@ export default function PsychologistDashboard() {
         } catch (err) { setError(err.message); } finally { setLoading(false); }
     };
 
+    const loadStudents = async () => {
+        try {
+            const data = await apiFetch('/api/psicologos/mis-alumnos');
+            setStudents(data);
+        } catch (e) { console.error("Error cargando alumnos", e); }
+    };
+
     const loadDisponibilidad = () => {
         setLoadingSlots(true);
         setSlots([]);
-        setNewSelectedSlot(null);
+        setSelectedSlot(null);
         
-        // --- CORRECCIÓN CLAVE: Usar format de date-fns para asegurar la fecha local ---
-        const fechaStr = format(newDate, 'yyyy-MM-dd'); 
+        const fechaStr = format(targetDate, 'yyyy-MM-dd'); 
         
         apiFetch(`/api/psicologos/${user.id}/disponibilidad?fecha=${fechaStr}`)
             .then(data => setSlots(data))
@@ -88,11 +109,13 @@ export default function PsychologistDashboard() {
         return { style: { backgroundColor, borderRadius: '6px', opacity: 0.9, color: 'white', border: 'none', display: 'block' } };
     };
 
+    // --- HANDLERS DETALLE / REAGENDAR ---
     const handleSelectEvent = (event) => {
         setSelectedCita(event);
         setIsRescheduling(false);
-        setNewSelectedSlot(null);
-        setShowModal(true);
+        setTargetDate(new Date()); // Reset fecha
+        setSelectedSlot(null);
+        setShowDetailModal(true);
     };
 
     const handleConfirmarCita = async () => {
@@ -102,36 +125,63 @@ export default function PsychologistDashboard() {
                 method: 'PATCH',
                 body: JSON.stringify({ estado: 'confirmada' })
             });
-            // Actualizar visualmente
             setEventos(prev => prev.map(ev => ev.id === selectedCita.id ? { ...ev, resource: { ...ev.resource, estado: 'confirmada' } } : ev));
-            setShowModal(false);
+            setShowDetailModal(false);
             alert("¡Cita confirmada!");
         } catch (err) { alert(err.message); }
     };
 
     const handleSaveReschedule = async () => {
-        if (!newSelectedSlot) return;
+        if (!selectedSlot) return;
         try {
-            // newSelectedSlot.start viene sin 'Z' (ej: "2023-10-25T15:00:00").
-            // Al hacer new Date(string), el navegador asume Hora Local.
-            // Al hacer JSON.stringify, se convierte a UTC correcto para la BD.
-            const startObj = new Date(newSelectedSlot.start);
-            const endObj = new Date(newSelectedSlot.end);
+            const startObj = new Date(selectedSlot.start);
+            const endObj = new Date(selectedSlot.end);
 
             await apiFetch(`/api/citas/${selectedCita.id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({
-                    start: startObj, 
+                    start: startObj, end: endObj, estado: 'confirmada'
+                })
+            });
+            alert("Cita reagendada exitosamente.");
+            setShowDetailModal(false);
+            loadAgenda();
+        } catch (err) { alert("Error: " + err.message); }
+    };
+
+    // --- HANDLERS CREAR NUEVA CITA ---
+    const handleOpenCreate = () => {
+        setNewCitaData({ studentId: '', notes: '' });
+        setTargetDate(new Date());
+        setSelectedSlot(null);
+        setShowCreateModal(true);
+    };
+
+    const handleCreateSubmit = async () => {
+        if (!selectedSlot || !newCitaData.studentId) {
+            alert("Debes seleccionar un alumno y un horario.");
+            return;
+        }
+        try {
+            const startObj = new Date(selectedSlot.start);
+            const endObj = new Date(selectedSlot.end);
+
+            await apiFetch('/api/citas/crear', {
+                method: 'POST',
+                body: JSON.stringify({
+                    paciente_id: newCitaData.studentId, // Enviamos ID directo
+                    titulo: 'Consulta Psicológica',
+                    start: startObj,
                     end: endObj,
-                    estado: 'confirmada'
+                    notas: newCitaData.notes
                 })
             });
 
-            alert("Cita reagendada exitosamente.");
-            setShowModal(false);
-            loadAgenda(); // Recargar para ver cambios
+            alert("Cita agendada correctamente.");
+            setShowCreateModal(false);
+            loadAgenda();
         } catch (err) {
-            alert("Error al reagendar: " + err.message);
+            alert("Error al crear cita: " + err.message);
         }
     };
 
@@ -139,16 +189,18 @@ export default function PsychologistDashboard() {
 
     return (
         <div className="fade-in">
+            {/* Header */}
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h1 className="fw-bold text-dark m-0" style={{ fontFamily: 'sans-serif' }}>AGENDA SEMANAL</h1>
                     <p className="text-muted m-0">Hola {user?.nombre}, gestiona tus solicitudes.</p>
                 </div>
-                <Button variant="outline-primary" as={Link} to="/dashboard/citas/crear" className="fw-bold shadow-sm rounded-pill px-4">
-                    <CalendarEvent className="me-2" /> Agendar Cita
+                <Button variant="primary" onClick={handleOpenCreate} className="fw-bold shadow-sm rounded-pill px-4">
+                    <PlusLg className="me-2" /> Agendar Cita
                 </Button>
             </div>
 
+            {/* Calendario */}
             <Card className="shadow border-0" style={{ borderRadius: '20px', overflow: 'hidden' }}>
                 <Card.Body className="p-4" style={{ height: '75vh', backgroundColor: '#ffffff' }}>
                     <Calendar
@@ -169,15 +221,15 @@ export default function PsychologistDashboard() {
                 </Card.Body>
             </Card>
 
-            <Modal show={showModal} onHide={() => setShowModal(false)} centered size={isRescheduling ? 'lg' : 'md'}>
+            {/* ================= MODAL 1: DETALLE / REAGENDAR ================= */}
+            <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} centered size={isRescheduling ? 'lg' : 'md'}>
                 <Modal.Header closeButton className="bg-light">
                     <Modal.Title className="fw-bold text-primary d-flex align-items-center">
                         {isRescheduling ? 'Reagendar Cita' : 'Detalle de Cita'}
                     </Modal.Title>
                 </Modal.Header>
-
                 <Modal.Body className="p-4">
-                    {!isRescheduling && selectedCita && (
+                    {!isRescheduling && selectedCita ? (
                         <div className="d-flex flex-column gap-3">
                             <div className="border-bottom pb-3 mb-2">
                                 <h4 className="fw-bold mb-1 text-dark">{selectedCita.titulo}</h4>
@@ -194,16 +246,15 @@ export default function PsychologistDashboard() {
                                 <div className="bg-light p-2 rounded mt-2 fst-italic">"{selectedCita.notas}"</div>
                             )}
                         </div>
-                    )}
-
-                    {isRescheduling && (
+                    ) : (
+                        // Vista Reagendar (Selector Fecha/Hora)
                         <div className="row g-3">
                             <div className="col-md-5">
                                 <Form.Label className="fw-bold">Nueva Fecha</Form.Label>
                                 <DatePicker
-                                    selected={newDate}
-                                    onChange={setNewDate}
-                                    className="form-control"
+                                    selected={targetDate}
+                                    onChange={setTargetDate}
+                                    className="form-control shadow-sm"
                                     dateFormat="dd/MM/yyyy"
                                     minDate={new Date()}
                                     inline
@@ -213,20 +264,14 @@ export default function PsychologistDashboard() {
                                 <PsychologistAvailabilityGrid 
                                     slots={slots}
                                     loading={loadingSlots}
-                                    selectedSlot={newSelectedSlot}
-                                    onSelectSlot={setNewSelectedSlot}
-                                    selectedDate={newDate}
+                                    selectedSlot={selectedSlot}
+                                    onSelectSlot={setSelectedSlot}
+                                    selectedDate={targetDate}
                                 />
-                                {slots.length > 0 && (
-                                    <small className="text-muted mt-2 d-block">
-                                        * El horario de almuerzo (12:40 - 14:00) está bloqueado.
-                                    </small>
-                                )}
                             </div>
                         </div>
                     )}
                 </Modal.Body>
-
                 <Modal.Footer className="justify-content-between">
                     {!isRescheduling ? (
                         <div className="d-flex gap-2 w-100">
@@ -242,13 +287,80 @@ export default function PsychologistDashboard() {
                     ) : (
                         <div className="d-flex gap-2 w-100 justify-content-end">
                             <Button variant="secondary" onClick={() => setIsRescheduling(false)}>Volver</Button>
-                            <Button variant="primary" onClick={handleSaveReschedule} disabled={!newSelectedSlot}>
+                            <Button variant="primary" onClick={handleSaveReschedule} disabled={!selectedSlot}>
                                 Confirmar Cambio
                             </Button>
                         </div>
                     )}
                 </Modal.Footer>
             </Modal>
+
+            {/* ================= MODAL 2: CREAR NUEVA CITA ================= */}
+            <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} centered size="lg" backdrop="static">
+                <Modal.Header closeButton className="bg-primary text-white">
+                    <Modal.Title className="fw-bold">Agendar Nueva Cita</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="p-4">
+                    <Row className="g-3">
+                        {/* Columna Izquierda: Datos del Alumno y Calendario */}
+                        <Col md={5}>
+                            <Form.Group className="mb-3">
+                                <Form.Label className="fw-bold">1. Selecciona Alumno</Form.Label>
+                                <Form.Select 
+                                    value={newCitaData.studentId}
+                                    onChange={(e) => setNewCitaData({...newCitaData, studentId: e.target.value})}
+                                >
+                                    <option value="">-- Elegir Alumno --</option>
+                                    {students.map(s => (
+                                        <option key={s.id} value={s.id}>{s.nombre} ({s.rut})</option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
+
+                            <Form.Group className="mb-3">
+                                <Form.Label className="fw-bold">2. Selecciona Fecha</Form.Label>
+                                <DatePicker
+                                    selected={targetDate}
+                                    onChange={setTargetDate}
+                                    className="form-control shadow-sm"
+                                    dateFormat="dd/MM/yyyy"
+                                    minDate={new Date()}
+                                    inline
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Columna Derecha: Horarios y Notas */}
+                        <Col md={7}>
+                            <PsychologistAvailabilityGrid 
+                                slots={slots}
+                                loading={loadingSlots}
+                                selectedSlot={selectedSlot}
+                                onSelectSlot={setSelectedSlot}
+                                selectedDate={targetDate}
+                            />
+                            
+                            <Form.Group className="mt-4">
+                                <Form.Label className="fw-bold">4. Notas (Opcional)</Form.Label>
+                                <Form.Control 
+                                    as="textarea" 
+                                    rows={2} 
+                                    placeholder="Motivo de la cita..."
+                                    value={newCitaData.notes}
+                                    onChange={(e) => setNewCitaData({...newCitaData, notes: e.target.value})}
+                                />
+                            </Form.Group>
+                        </Col>
+                    </Row>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowCreateModal(false)}>Cancelar</Button>
+                    <Button variant="success" onClick={handleCreateSubmit} disabled={!selectedSlot || !newCitaData.studentId}>
+                        Confirmar Cita
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
         </div>
     );
 }

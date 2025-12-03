@@ -35,7 +35,34 @@ function isAdmin(req, res, next) {
   next();
 }
 
-// ================== RUTAS PÚBLICAS Y AUTH ==================
+// === FUNCIÓN AUXILIAR PARA VERIFICAR SOLAPAMIENTO ===
+const checkSolapamiento = async (psicologo_id, start, end, excludeCitaId = null) => {
+  // Convertimos a objetos Date para asegurar comparación numérica
+  const newStart = new Date(start);
+  const newEnd = new Date(end);
+
+  // Buscamos citas activas (no canceladas) de este psicólogo
+  let query = `
+    SELECT id, fecha_hora_inicio, fecha_hora_fin 
+    FROM citas 
+    WHERE psicologo_id = $1 
+    AND estado != 'cancelada'
+    AND (
+      (fecha_hora_inicio < $3 AND fecha_hora_fin > $2) -- Lógica de intersección
+    )
+  `;
+  const params = [psicologo_id, newStart.toISOString(), newEnd.toISOString()];
+
+  if (excludeCitaId) {
+    query += ` AND id != $4`;
+    params.push(excludeCitaId);
+  }
+
+  const result = await pool.query(query, params);
+  return result.rows.length > 0; // Retorna true si hay conflicto
+};
+
+// ================== RUTAS PÚBLICAS ==================
 
 router.get("/", (req, res) => res.send("API conectada a Neon 🚀"));
 
@@ -643,38 +670,75 @@ router.get('/citas/:id', authenticateToken, async (req, res) => {
 });
 
 router.post('/citas/crear', authenticateToken, async (req, res) => {
-  const { titulo, start, end, notas, nombre_paciente, psicologo_id: psiIdBody } = req.body;
+  const { titulo, start, end, notas, nombre_paciente, paciente_id: pidBody, psicologo_id: psiIdBody } = req.body;
   let psicologo_id, paciente_id;
 
-  if (req.user.rol === 3) {
+  // Lógica de roles (igual que antes)
+  if (req.user.rol === 3) { // Psicólogo
     psicologo_id = req.user.id;
-    const pRes = await pool.query("SELECT id FROM usuarios WHERE nombre = $1 AND rol = 2", [nombre_paciente]);
-    if (pRes.rows.length === 0) return res.status(404).json({ error: "Alumno no encontrado" });
-    paciente_id = pRes.rows[0].id;
-  } else if (req.user.rol === 2) {
+    if (pidBody) {
+        paciente_id = pidBody;
+    } else if (nombre_paciente) {
+        const pacienteResult = await pool.query("SELECT id FROM usuarios WHERE nombre ILIKE $1 AND rol = 2", [nombre_paciente]);
+        if (pacienteResult.rows.length === 0) return res.status(404).json({ error: 'Paciente no encontrado' });
+        paciente_id = pacienteResult.rows[0].id;
+    } else {
+        return res.status(400).json({ error: 'Debe seleccionar un alumno.' });
+    }
+  } else if (req.user.rol === 2) { // Alumno
     paciente_id = req.user.id;
     psicologo_id = psiIdBody;
   } else {
-    return res.status(403).json({ error: "Permiso denegado" });
+    return res.status(403).json({ error: 'Permiso denegado' });
   }
 
+  if (!titulo || !start || !end) return res.status(400).json({ error: 'Faltan datos de la cita' });
+
   try {
+    // --- VALIDACIÓN DE DISPONIBILIDAD ---
+    const ocupado = await checkSolapamiento(psicologo_id, start, end);
+    if (ocupado) {
+      return res.status(409).json({ error: "El horario seleccionado ya está ocupado por otra cita." });
+    }
+    // ------------------------------------
+
     const result = await pool.query(
       `INSERT INTO citas (psicologo_id, paciente_id, titulo, fecha_hora_inicio, fecha_hora_fin, notas, estado) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'pendiente') RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'confirmada') 
+       RETURNING *, fecha_hora_inicio AS "start", fecha_hora_fin AS "end"`,
       [psicologo_id, paciente_id, titulo, start, end, notas || '']
     );
-    res.status(201).json({ message: "Cita agendada", cita: result.rows[0] });
+    
+    res.status(201).json({ message: "Cita agendada con éxito 🚀", cita: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: "Error al crear cita" });
+    console.error(err);
+    res.status(500).json({ error: 'Error al crear la cita' });
   }
 });
 
+
+// 7. ACTUALIZAR CITA / REAGENDAR (Actualizado con validación de solapamiento)
 router.patch('/citas/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { estado, start, end } = req.body;
 
   try {
+    // Si se intenta cambiar la fecha (Reagendar), verificamos disponibilidad
+    if (start && end) {
+      // 1. Obtener el ID del psicólogo de la cita actual para verificar SU agenda
+      const citaActual = await pool.query("SELECT psicologo_id FROM citas WHERE id = $1", [id]);
+      if (citaActual.rows.length === 0) return res.status(404).json({ error: "Cita no encontrada" });
+      
+      const psicologo_id = citaActual.rows[0].psicologo_id;
+
+      // 2. Verificar solapamiento (excluyendo esta misma cita ID)
+      const ocupado = await checkSolapamiento(psicologo_id, start, end, id);
+      if (ocupado) {
+        return res.status(409).json({ error: "El nuevo horario seleccionado ya está ocupado." });
+      }
+    }
+
+    // --- Procedemos con la actualización normal ---
     const fields = [];
     const values = [];
     let idx = 1;
@@ -687,27 +751,26 @@ router.patch('/citas/:id', authenticateToken, async (req, res) => {
 
     values.push(id);
 
-    // Actualizamos y retornamos los datos para actualizar la interfaz
     const query = `
-        UPDATE citas 
-        SET ${fields.join(', ')} 
-        WHERE id = $${idx} 
-        RETURNING id, titulo, fecha_hora_inicio, fecha_hora_fin, estado, notas, lugar
+        UPDATE citas c
+        SET ${fields.join(', ')}
+        FROM usuarios u
+        WHERE c.id = $${idx} AND c.paciente_id = u.id
+        RETURNING c.id, c.titulo, c.fecha_hora_inicio, c.fecha_hora_fin, c.estado, c.notas, c.lugar, u.nombre as "pacienteNombre"
     `;
 
     const result = await pool.query(query, values);
 
-    if (result.rowCount === 0) return res.status(404).json({ error: "Cita no encontrada" });
+    if (result.rowCount === 0) return res.status(404).json({ error: "No se pudo actualizar la cita" });
 
-    // Devolvemos la cita con los campos formateados para que el frontend los entienda
     const cita = result.rows[0];
-    res.json({
-      message: "Cita reagendada correctamente",
-      cita: {
-        ...cita,
-        start: cita.fecha_hora_inicio,
-        end: cita.fecha_hora_fin
-      }
+    res.json({ 
+        message: "Cita actualizada correctamente", 
+        cita: {
+            ...cita,
+            start: cita.fecha_hora_inicio,
+            end: cita.fecha_hora_fin
+        }
     });
 
   } catch (err) {
