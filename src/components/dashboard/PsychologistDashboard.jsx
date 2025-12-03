@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { Link } from 'react-router-dom';
@@ -46,15 +46,16 @@ export default function PsychologistDashboard() {
     // Modal
     const [showModal, setShowModal] = useState(false);
     const [selectedCita, setSelectedCita] = useState(null);
+    const [confirming, setConfirming] = useState(false); // Estado para loading del botón confirmar
 
-    useEffect(() => {
-        loadAgenda();
-    }, []);
-
-    const loadAgenda = async () => {
+    // Definimos loadAgenda con useCallback para poder usarlo en useEffect y handlers
+    const loadAgenda = useCallback(async (isBackground = false) => {
         try {
-            setLoading(true);
-            const data = await apiFetch('/api/citas');
+            if (!isBackground) setLoading(true);
+
+            // Agregamos un timestamp (?t=...) para evitar que el navegador guarde caché 
+            // y obligarlo a traer el dato real actualizado de la BD.
+            const data = await apiFetch(`/api/citas?t=${new Date().getTime()}`);
 
             // Transformar datos para BigCalendar
             const citasFormateadas = data.map(cita => ({
@@ -70,18 +71,24 @@ export default function PsychologistDashboard() {
             console.error(err);
             setError(err.message);
         } finally {
-            setLoading(false);
+            if (!isBackground) setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadAgenda();
+    }, [loadAgenda]);
 
     // --- LÓGICA DE COLORES ---
-    // Verde si está confirmada, Gris si es solicitud/pendiente
     const eventStyleGetter = (event) => {
         const estado = event.resource.estado;
-        let backgroundColor = '#6c757d'; // GRIS por defecto
+        let backgroundColor = '#6c757d'; // GRIS por defecto (pendiente)
 
-        if (estado === 'confirmada') {
+        // Verificamos estado. Aceptamos 'confirmada' o 'aceptado'
+        if (estado === 'confirmada' || estado === 'aceptado') {
             backgroundColor = '#198754'; // VERDE
+        } else if (estado === 'cancelada') {
+            backgroundColor = '#dc3545'; // ROJO
         }
 
         const style = {
@@ -106,34 +113,35 @@ export default function PsychologistDashboard() {
     // --- ACCIÓN CONFIRMAR ---
     const handleConfirmarCita = async () => {
         if (!selectedCita) return;
+        setConfirming(true);
         try {
-            // Llamada a la API PATCH
+            // 1. Actualizar en Base de Datos
             await apiFetch(`/api/citas/${selectedCita.id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ estado: 'confirmada' })
             });
 
-            // Actualizar estado local para ver el cambio de color inmediatamente
-            setEventos(prev => prev.map(ev =>
-                ev.id === selectedCita.id
-                    ? { ...ev, resource: { ...ev.resource, estado: 'confirmada' } }
-                    : ev
-            ));
+            // 2. Recargar datos DESDE EL SERVIDOR inmediatamente
+            // Pasamos 'true' para que no muestre el spinner de carga general, solo actualice
+            await loadAgenda(true);
 
             setShowModal(false);
-            alert("¡Cita confirmada exitosamente!");
+            // Pequeño timeout para asegurar que el usuario note la acción, opcional
+            setTimeout(() => alert("¡Cita confirmada exitosamente!"), 100);
+
         } catch (err) {
             alert("Error al confirmar: " + err.message);
+        } finally {
+            setConfirming(false);
         }
     };
 
     // --- ACCIÓN REAGENDAR ---
     const handleReagendarCita = () => {
-        // Aquí puedes implementar lógica adicional o redirigir a una página de edición
         alert("Funcionalidad para reagendar (editar fecha/hora) en proceso.");
     };
 
-    if (loading) return <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>;
+    if (loading && eventos.length === 0) return <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>;
     if (error) return <div className="p-4 text-danger">Error: {error}</div>;
 
     return (
@@ -168,7 +176,7 @@ export default function PsychologistDashboard() {
                 </Card.Body>
             </Card>
 
-            {/* Modal de Detalle Actualizado */}
+            {/* Modal de Detalle */}
             <Modal show={showModal} onHide={() => setShowModal(false)} centered>
                 <Modal.Header closeButton style={{ background: '#f8f9fa', borderBottom: 'none' }}>
                     <Modal.Title className="fw-bold text-primary d-flex align-items-center">
@@ -196,7 +204,7 @@ export default function PsychologistDashboard() {
                                 <Person size={24} className="text-primary me-3" />
                                 <div>
                                     <small className="text-uppercase fw-bold text-muted" style={{ fontSize: '0.65rem', letterSpacing: '1px' }}>ALUMNO</small>
-                                    <div className="fs-5 fw-bold text-dark">{selectedCita.pacienteNombre}</div>
+                                    <div className="fs-5 fw-bold text-dark">{selectedCita.resource.pacienteNombre}</div>
                                 </div>
                             </div>
 
@@ -219,13 +227,13 @@ export default function PsychologistDashboard() {
                                 </div>
                             )}
 
-                            {selectedCita.notas && (
+                            {selectedCita.resource.notas && (
                                 <div className="mt-2">
                                     <div className="d-flex align-items-center mb-2 text-secondary fw-bold small text-uppercase">
                                         <TextLeft className="me-2" /> Motivo / Notas
                                     </div>
                                     <p className="mb-0 text-dark bg-light p-3 rounded-3 border-start border-4 border-primary" style={{ fontStyle: 'italic' }}>
-                                        "{selectedCita.notas}"
+                                        "{selectedCita.resource.notas}"
                                     </p>
                                 </div>
                             )}
@@ -243,8 +251,13 @@ export default function PsychologistDashboard() {
 
                         {/* Botón 2: Confirmar (Solo visible si NO está confirmada) */}
                         {selectedCita?.resource.estado !== 'confirmada' && (
-                            <Button variant="success" onClick={handleConfirmarCita} className="flex-fill fw-bold">
-                                <CheckCircleFill className="me-2" /> Confirmar
+                            <Button
+                                variant="success"
+                                onClick={handleConfirmarCita}
+                                className="flex-fill fw-bold"
+                                disabled={confirming}
+                            >
+                                {confirming ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : <><CheckCircleFill className="me-2" /> Confirmar</>}
                             </Button>
                         )}
                     </div>
