@@ -80,7 +80,8 @@ export default function PsychologistDashboard() {
         const estado = event.resource.estado;
         let backgroundColor = '#6c757d'; // GRIS por defecto
 
-        if (estado === 'confirmada') {
+        // Aceptamos 'confirmada' o 'aceptado' para ponerlo en verde
+        if (estado === 'confirmada' || estado === 'aceptado') {
             backgroundColor = '#198754'; // VERDE
         }
 
@@ -107,13 +108,13 @@ export default function PsychologistDashboard() {
     const handleConfirmarCita = async () => {
         if (!selectedCita) return;
         try {
-            // Llamada a la API PATCH
+            // 1. Llamada a la API PATCH para guardar en base de datos
             await apiFetch(`/api/citas/${selectedCita.id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ estado: 'confirmada' })
             });
 
-            // Actualizar estado local para ver el cambio de color inmediatamente
+            // 2. Actualizar estado local para ver el cambio de color inmediatamente (Gris -> Verde)
             setEventos(prev => prev.map(ev =>
                 ev.id === selectedCita.id
                     ? { ...ev, resource: { ...ev.resource, estado: 'confirmada' } }
@@ -129,7 +130,6 @@ export default function PsychologistDashboard() {
 
     // --- ACCIÓN REAGENDAR ---
     const handleReagendarCita = () => {
-        // Aquí puedes implementar lógica adicional o redirigir a una página de edición
         alert("Funcionalidad para reagendar (editar fecha/hora) en proceso.");
     };
 
@@ -138,16 +138,19 @@ export default function PsychologistDashboard() {
 
     return (
         <div className="fade-in">
+            {/* Header */}
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h1 className="fw-bold text-dark m-0" style={{ fontFamily: 'sans-serif' }}>AGENDA SEMANAL</h1>
                     <p className="text-muted m-0">Hola {user?.nombre}, gestiona tus solicitudes.</p>
                 </div>
+                {/* Botón para crear cita manualmente si es necesario */}
                 <Button variant="outline-primary" as={Link} to="/dashboard/citas/crear" className="fw-bold shadow-sm rounded-pill px-4">
                     <CalendarEvent className="me-2" /> Agendar Cita
                 </Button>
             </div>
 
+            {/* Calendario */}
             <Card className="shadow border-0" style={{ borderRadius: '20px', overflow: 'hidden' }}>
                 <Card.Body className="p-4" style={{ height: '75vh', backgroundColor: '#ffffff' }}>
                     <Calendar
@@ -168,7 +171,7 @@ export default function PsychologistDashboard() {
                 </Card.Body>
             </Card>
 
-            {/* Modal de Detalle Actualizado */}
+            {/* Modal de Detalle / Confirmación */}
             <Modal show={showModal} onHide={() => setShowModal(false)} centered>
                 <Modal.Header closeButton style={{ background: '#f8f9fa', borderBottom: 'none' }}>
                     <Modal.Title className="fw-bold text-primary d-flex align-items-center">
@@ -192,6 +195,7 @@ export default function PsychologistDashboard() {
                                 <span className="text-muted small ms-2">ID: {selectedCita.id}</span>
                             </div>
 
+                            {/* Información del Alumno */}
                             <div className="d-flex align-items-center p-3 bg-light rounded-3">
                                 <Person size={24} className="text-primary me-3" />
                                 <div>
@@ -200,6 +204,7 @@ export default function PsychologistDashboard() {
                                 </div>
                             </div>
 
+                            {/* Fecha y Hora */}
                             <div className="d-flex align-items-center px-3">
                                 <Clock size={22} className="text-muted me-3" />
                                 <div>
@@ -233,15 +238,15 @@ export default function PsychologistDashboard() {
                     )}
                 </Modal.Body>
 
-                {/* --- FOOTER CON LOS 3 BOTONES --- */}
+                {/* Footer con Botones */}
                 <Modal.Footer className="justify-content-between">
                     <div className="d-flex gap-2 w-100">
-                        {/* Botón 1: Reagendar */}
+                        {/* Botón Reagendar */}
                         <Button variant="warning" onClick={handleReagendarCita} className="flex-fill text-white fw-bold">
                             <CalendarRange className="me-2" /> Reagendar
                         </Button>
 
-                        {/* Botón 2: Confirmar (Solo visible si NO está confirmada) */}
+                        {/* Botón Confirmar (Solo visible si NO está confirmada) */}
                         {selectedCita?.resource.estado !== 'confirmada' && (
                             <Button variant="success" onClick={handleConfirmarCita} className="flex-fill fw-bold">
                                 <CheckCircleFill className="me-2" /> Confirmar
@@ -249,7 +254,7 @@ export default function PsychologistDashboard() {
                         )}
                     </div>
 
-                    {/* Botón 3: Ver Ficha (Abajo, ancho completo) */}
+                    {/* Botón Ver Ficha Completa */}
                     {selectedCita && (
                         <Button
                             as={Link}

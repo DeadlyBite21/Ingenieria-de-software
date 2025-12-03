@@ -257,7 +257,6 @@ router.delete("/usuarios/:id", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-
 // Cambiar contraseña (Asumimos que solo Admin puede cambiar la de otros)
 router.post("/usuarios/cambiar-contraseña", authenticateToken, isAdmin, async (req, res) => {
   const { id, nuevaContraseña } = req.body;
@@ -358,7 +357,6 @@ router.delete("/cursos/:id", authenticateToken, isAdmin, async (req, res) => {
     res.status(500).json({ error: "Error en el servidor al eliminar el curso" });
   }
 });
-
 
 // Asignar usuario a curso (Solo Admin)
 router.post("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin, async (req, res) => {
@@ -1064,132 +1062,203 @@ router.get('/encuestas/:id/resultados', authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Error en el servidor al obtener resultados." });
   }
 });
-// ================== GESTIÓN DE AGENDA (CITAS) ==================
 
-// Obtener lista de psicólogos (Para que el alumno elija)
+// ================== PSICÓLOGO & CITAS (SOLUCIONES) ==================
+
+// 1. Obtener lista de psicólogos
 router.get('/psicologos', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT id, nombre, correo FROM usuarios WHERE rol = 3 ORDER BY nombre"
-    );
+    const result = await pool.query("SELECT id, nombre, correo FROM usuarios WHERE rol = 3 ORDER BY nombre");
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: "Error al obtener psicólogos" });
   }
 });
-// Obtener citas (Modificado para soportar vista de alumno)
-router.get('/citas', authenticateToken, async (req, res) => {
-  let psicologo_id;
 
-  // Si es Alumno (2), debe indicar qué agenda quiere ver
-  if (req.user.rol === 2) {
-    if (!req.query.psicologo_id) {
-      return res.status(400).json({ error: 'Debe especificar un psicologo_id' });
-    }
-    psicologo_id = req.query.psicologo_id;
-  } else if (req.user.rol === 3) {
-    // Si es Psicólogo (3), ve su propia agenda
-    psicologo_id = req.user.id;
-  } else if (req.user.rol === 0) {
-     // Si es Admin (0), podría ver cualquiera, aquí asumimos que pasa el ID o ve el suyo
-     psicologo_id = req.query.psicologo_id || req.user.id;
-  } else {
-    return res.status(403).json({ error: 'Acceso denegado.' });
+// 2. LISTA DE ALUMNOS (Ruta que faltaba y causaba error 404 en sidebar)
+router.get('/psicologos/mis-alumnos', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, rut, nombre, correo FROM usuarios WHERE rol = 2 ORDER BY nombre ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error alumnos:", err);
+    res.status(500).json({ error: "Error al cargar alumnos" });
   }
+});
+
+// 3. DISPONIBILIDAD (Bloques 40 min para el alumno)
+router.get('/psicologos/:id/disponibilidad', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { fecha } = req.query;
+  if (!fecha) return res.status(400).json({ error: "Falta la fecha" });
 
   try {
-    const result = await pool.query(
-      `SELECT 
+    const query = `
+      SELECT fecha_hora_inicio, fecha_hora_fin 
+      FROM citas 
+      WHERE psicologo_id = $1 AND date(fecha_hora_inicio) = $2 AND estado != 'cancelada'
+    `;
+    const citasExistentes = await pool.query(query, [id, fecha]);
+
+    const slots = [];
+    const duracionMinutos = 40;
+    let horaActual = new Date(`${fecha}T09:00:00`);
+    const horaFinDia = new Date(`${fecha}T18:00:00`);
+
+    while (horaActual < horaFinDia) {
+      const finBloque = new Date(horaActual.getTime() + duracionMinutos * 60000);
+      const horaCheck = horaActual.getHours();
+      // Break almuerzo 13:00 - 14:00
+      if (horaCheck !== 13) {
+        const isOccupied = citasExistentes.rows.some(cita => {
+          const cIni = new Date(cita.fecha_hora_inicio);
+          const cFin = new Date(cita.fecha_hora_fin);
+          return (horaActual < cFin && finBloque > cIni);
+        });
+        if (!isOccupied) {
+          slots.push({ start: horaActual.toISOString(), end: finBloque.toISOString() });
+        }
+      }
+      horaActual = finBloque;
+    }
+    res.json(slots);
+  } catch (err) {
+    res.status(500).json({ error: "Error al calcular horarios" });
+  }
+});
+
+// 4. GET CITAS (Inteligente para todos los roles)
+router.get('/citas', authenticateToken, async (req, res) => {
+  try {
+    let whereClause = "";
+    const values = [];
+
+    if (req.user.rol === 2) { // Alumno
+      whereClause = "WHERE c.paciente_id = $1";
+      values.push(req.user.id);
+    } else if (req.user.rol === 3) { // Psicólogo
+      whereClause = "WHERE c.psicologo_id = $1";
+      values.push(req.user.id);
+    } else if (req.user.rol === 0) { // Admin
+      if (req.query.psicologo_id) {
+        whereClause = "WHERE c.psicologo_id = $1";
+        values.push(req.query.psicologo_id);
+      }
+    }
+
+    const query = `
+      SELECT 
          c.id, 
          c.titulo, 
          c.fecha_hora_inicio AS "start", 
-         c.fecha_hora_fin AS "end", 
-         c.notas, 
-         u.nombre AS "pacienteNombre" 
+         c.fecha_hora_fin AS "end",
+         c.notas,
+         c.estado,  
+         c.lugar,
+         pac.nombre AS "pacienteNombre",
+         pac.correo AS "pacienteCorreo",
+         psi.nombre AS "psicologoNombre"
        FROM citas c
-       JOIN usuarios u ON c.paciente_id = u.id
-       WHERE c.psicologo_id = $1
-       ORDER BY c.fecha_hora_inicio`,
-      [psicologo_id]
-    );
+       LEFT JOIN usuarios pac ON c.paciente_id = pac.id
+       LEFT JOIN usuarios psi ON c.psicologo_id = psi.id
+       ${whereClause}
+       ORDER BY c.fecha_hora_inicio ASC
+    `;
+    const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error al obtener citas:', err);
     res.status(500).json({ error: 'Error al obtener citas' });
   }
 });
 
-// Crear cita (Modificado para Psicólogos y Alumnos)
-router.post('/citas/crear', authenticateToken, async (req, res) => {
-  const { titulo, start, end, notas } = req.body;
-  let psicologo_id;
-  let paciente_id;
-
-  // Lógica para Psicólogo (Rol 3): Agenda a un paciente por nombre
-  if (req.user.rol === 3) {
-    psicologo_id = req.user.id;
-    const { nombre_paciente } = req.body;
-    if (!nombre_paciente) return res.status(400).json({ error: 'Falta nombre_paciente' });
-
-    // Buscar ID del paciente
-    const pacienteResult = await pool.query(
-      "SELECT id FROM usuarios WHERE nombre ILIKE $1 AND rol = 2", 
-      [nombre_paciente]
-    );
-    if (pacienteResult.rows.length === 0) return res.status(404).json({ error: 'Paciente no encontrado' });
-    paciente_id = pacienteResult.rows[0].id;
-  } 
-  // Lógica para Alumno (Rol 2): Se agenda a sí mismo con un psicólogo
-  else if (req.user.rol === 2) {
-    paciente_id = req.user.id; // El paciente es el usuario logueado
-    if (!req.body.psicologo_id) return res.status(400).json({ error: 'Falta seleccionar psicólogo' });
-    psicologo_id = req.body.psicologo_id;
-  } 
-  else {
-    return res.status(403).json({ error: 'Permiso denegado' });
-  }
-
-  if (!titulo || !start || !end) {
-    return res.status(400).json({ error: 'Faltan datos de la cita' });
-  }
-
+// 5. GET DETALLE CITA
+router.get('/citas/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
   try {
     const result = await pool.query(
-      `INSERT INTO citas (psicologo_id, paciente_id, titulo, fecha_hora_inicio, fecha_hora_fin, notas) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING *, fecha_hora_inicio AS "start", fecha_hora_fin AS "end"`,
-      [psicologo_id, paciente_id, titulo, start, end, notas || '']
+      `SELECT 
+         c.id, c.titulo AS motivo, c.fecha_hora_inicio AS fecha_hora, c.fecha_hora_fin,
+         c.lugar, c.estado, c.notas,
+         pac.nombre AS nombre_alumno, pac.rut AS rut_alumno,
+         psi.nombre AS nombre_profesor
+       FROM citas c
+       LEFT JOIN usuarios pac ON c.paciente_id = pac.id
+       LEFT JOIN usuarios psi ON c.psicologo_id = psi.id
+       WHERE c.id = $1`,
+      [id]
     );
-    res.status(201).json({ message: "Cita agendada con éxito 🚀", cita: result.rows[0] });
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Cita no encontrada' });
+    res.json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23P01' || err.code === '40P01') { 
-        return res.status(409).json({ error: "El horario seleccionado ya está ocupado." });
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Error al crear la cita' });
+    res.status(500).json({ error: 'Error en el servidor' });
   }
 });
 
-// Eliminar una cita
-router.delete('/citas/:id', authenticateToken, async (req, res) => {
-  const psicologo_id = req.user.id;
-  const { id } = req.params;
+// 6. CREAR CITA
+router.post('/citas/crear', authenticateToken, async (req, res) => {
+  const { titulo, start, end, notas, nombre_paciente, psicologo_id: psiIdBody } = req.body;
+  let psicologo_id, paciente_id;
+
+  // Psicólogo creando cita
+  if (req.user.rol === 3) {
+    psicologo_id = req.user.id;
+    if (!nombre_paciente) return res.status(400).json({ error: 'Falta nombre_paciente' });
+    const pacienteRes = await pool.query("SELECT id FROM usuarios WHERE nombre = $1 AND rol = 2", [nombre_paciente]);
+    if (pacienteRes.rows.length === 0) return res.status(404).json({ error: 'Alumno no encontrado' });
+    paciente_id = pacienteRes.rows[0].id;
+
+    // Alumno solicitando cita
+  } else if (req.user.rol === 2) {
+    paciente_id = req.user.id;
+    if (!psiIdBody) return res.status(400).json({ error: 'Falta seleccionar psicólogo' });
+    psicologo_id = psiIdBody;
+  } else {
+    // Admin u otro
+    return res.status(403).json({ error: 'Permiso denegado para crear citas' });
+  }
 
   try {
     const result = await pool.query(
-      'DELETE FROM citas WHERE id = $1 AND psicologo_id = $2 RETURNING *',
-      [id, psicologo_id]
+      `INSERT INTO citas (psicologo_id, paciente_id, titulo, fecha_hora_inicio, fecha_hora_fin, notas, estado) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'pendiente') 
+       RETURNING *`,
+      [psicologo_id, paciente_id, titulo, start, end, notas || '']
     );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Cita no encontrada o no pertenece a este psicólogo' });
-    }
-    
-    res.json({ message: 'Cita eliminada exitosamente' });
+    res.status(201).json({ message: "Cita agendada", cita: result.rows[0] });
   } catch (err) {
-    console.error('Error al eliminar cita:', err);
-    res.status(500).json({ error: 'Error al eliminar cita' });
+    res.status(500).json({ error: 'Error al crear cita' });
+  }
+});
+
+// 7. ACTUALIZAR CITA (PATCH) - La ruta que fallaba antes
+router.patch('/citas/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  try {
+    if (estado) {
+      const result = await pool.query(
+        "UPDATE citas SET estado = $1 WHERE id = $2 RETURNING *",
+        [estado, id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: "Cita no encontrada" });
+      return res.json({ message: "Cita actualizada", cita: result.rows[0] });
+    }
+    res.status(400).json({ error: "Nada para actualizar" });
+  } catch (err) {
+    console.error("Error update cita:", err);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// 8. BORRAR CITA
+router.delete('/citas/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM citas WHERE id = $1', [id]);
+    res.json({ message: 'Cita eliminada' });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al eliminar' });
   }
 });
 
