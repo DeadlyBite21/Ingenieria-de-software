@@ -306,7 +306,7 @@ router.post("/cursos/crear", authenticateToken, isAdmin, async (req, res) => {
 router.get("/cursos", authenticateToken, async (req, res) => {
   try {
     // Si es admin, ve todos los cursos
-    if (req.user.rol === 0) {
+    if (req.user.rol === 0 || req.user.rol === 3) {
       const result = await pool.query("SELECT * FROM cursos ORDER BY id");
       return res.json(result.rows);
     }
@@ -1089,40 +1089,74 @@ router.get('/psicologos/mis-alumnos', authenticateToken, async (req, res) => {
 // 3. DISPONIBILIDAD (Bloques 40 min para el alumno)
 router.get('/psicologos/:id/disponibilidad', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { fecha } = req.query;
+  const { fecha } = req.query; // YYYY-MM-DD
+
   if (!fecha) return res.status(400).json({ error: "Falta la fecha" });
 
   try {
+    // 1. Citas ocupadas (convertimos a string para comparar texto vs texto y evitar líos de zona)
     const query = `
-      SELECT fecha_hora_inicio, fecha_hora_fin 
+      SELECT to_char(fecha_hora_inicio, 'HH24:MI') as hora_inicio, 
+             to_char(fecha_hora_fin, 'HH24:MI') as hora_fin
       FROM citas 
-      WHERE psicologo_id = $1 AND date(fecha_hora_inicio) = $2 AND estado != 'cancelada'
+      WHERE psicologo_id = $1 
+      AND to_char(fecha_hora_inicio, 'YYYY-MM-DD') = $2
+      AND estado != 'cancelada'
     `;
     const citasExistentes = await pool.query(query, [id, fecha]);
 
     const slots = [];
     const duracionMinutos = 40;
-    let horaActual = new Date(`${fecha}T09:00:00`);
-    const horaFinDia = new Date(`${fecha}T18:00:00`);
 
-    while (horaActual < horaFinDia) {
-      const finBloque = new Date(horaActual.getTime() + duracionMinutos * 60000);
-      const horaCheck = horaActual.getHours();
-      // Break almuerzo 13:00 - 14:00
-      if (horaCheck !== 13) {
-        const isOccupied = citasExistentes.rows.some(cita => {
-          const cIni = new Date(cita.fecha_hora_inicio);
-          const cFin = new Date(cita.fecha_hora_fin);
-          return (horaActual < cFin && finBloque > cIni);
+    // Trabajamos con minutos desde medianoche para evitar objetos Date y zonas horarias
+    const inicioDia = 9 * 60;  // 09:00 = 540 min
+    const finDia = 18 * 60;    // 18:00 = 1080 min
+    
+    // Bloqueo Almuerzo: 12:40 (760 min) a 14:00 (840 min)
+    const inicioAlmuerzo = 12 * 60 + 40; 
+    const finAlmuerzo = 14 * 60;
+
+    let minutoActual = inicioDia;
+
+    while (minutoActual + duracionMinutos <= finDia) {
+      const minutoFin = minutoActual + duracionMinutos;
+
+      // Verificar colisión con almuerzo
+      // Se solapa si el bloque termina después de que empiece el almuerzo 
+      // Y empieza antes de que termine
+      const chocaAlmuerzo = (minutoActual < finAlmuerzo && minutoFin > inicioAlmuerzo);
+
+      // Verificar colisión con citas DB
+      const chocaCita = citasExistentes.rows.some(c => {
+        const [hIni, mIni] = c.hora_inicio.split(':').map(Number);
+        const [hFin, mFin] = c.hora_fin.split(':').map(Number);
+        const citaInicioMin = hIni * 60 + mIni;
+        const citaFinMin = hFin * 60 + mFin;
+
+        return (minutoActual < citaFinMin && minutoFin > citaInicioMin);
+      });
+
+      if (!chocaAlmuerzo && !chocaCita) {
+        // Formatear a HH:mm
+        const hStart = Math.floor(minutoActual / 60).toString().padStart(2, '0');
+        const mStart = (minutoActual % 60).toString().padStart(2, '0');
+        const hEnd = Math.floor(minutoFin / 60).toString().padStart(2, '0');
+        const mEnd = (minutoFin % 60).toString().padStart(2, '0');
+
+        // Enviamos formato ISO SIN ZONA (T00:00:00) para que el front lo tome como local
+        slots.push({
+          start: `${fecha}T${hStart}:${mStart}:00`,
+          end: `${fecha}T${hEnd}:${mEnd}:00`
         });
-        if (!isOccupied) {
-          slots.push({ start: horaActual.toISOString(), end: finBloque.toISOString() });
-        }
       }
-      horaActual = finBloque;
+
+      minutoActual = minutoFin;
     }
+
     res.json(slots);
+
   } catch (err) {
+    console.error("Error disponibilidad:", err);
     res.status(500).json({ error: "Error al calcular horarios" });
   }
 });
@@ -1233,18 +1267,44 @@ router.post('/citas/crear', authenticateToken, async (req, res) => {
 // 7. ACTUALIZAR CITA (PATCH) - La ruta que fallaba antes
 router.patch('/citas/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { estado } = req.body;
+  const { estado, start, end } = req.body;
 
   try {
-    if (estado) {
-      const result = await pool.query(
-        "UPDATE citas SET estado = $1 WHERE id = $2 RETURNING *",
-        [estado, id]
-      );
-      if (result.rowCount === 0) return res.status(404).json({ error: "Cita no encontrada" });
-      return res.json({ message: "Cita actualizada", cita: result.rows[0] });
-    }
-    res.status(400).json({ error: "Nada para actualizar" });
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (estado) { fields.push(`estado = $${idx++}`); values.push(estado); }
+    if (start) { fields.push(`fecha_hora_inicio = $${idx++}`); values.push(start); }
+    if (end) { fields.push(`fecha_hora_fin = $${idx++}`); values.push(end); }
+
+    if (fields.length === 0) return res.status(400).json({ error: "Nada para actualizar" });
+
+    values.push(id);
+
+    // Actualizamos y retornamos los datos para actualizar la interfaz
+    const query = `
+        UPDATE citas 
+        SET ${fields.join(', ')} 
+        WHERE id = $${idx} 
+        RETURNING id, titulo, fecha_hora_inicio, fecha_hora_fin, estado, notas, lugar
+    `;
+    
+    const result = await pool.query(query, values);
+
+    if (result.rowCount === 0) return res.status(404).json({ error: "Cita no encontrada" });
+
+    // Devolvemos la cita con los campos formateados para que el frontend los entienda
+    const cita = result.rows[0];
+    res.json({ 
+        message: "Cita reagendada correctamente", 
+        cita: {
+            ...cita,
+            start: cita.fecha_hora_inicio,
+            end: cita.fecha_hora_fin
+        }
+    });
+
   } catch (err) {
     console.error("Error update cita:", err);
     res.status(500).json({ error: "Error en el servidor" });
