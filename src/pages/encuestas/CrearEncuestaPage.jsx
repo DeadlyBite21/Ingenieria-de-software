@@ -1,4 +1,4 @@
-// src/pages/CrearEncuestaPage.jsx
+// src/pages/encuestas/CrearEncuestaPage.jsx
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../../utils/api';
 import { useNavigate, Link } from 'react-router-dom';
@@ -25,13 +25,16 @@ export default function CrearEncuestaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Estilos comunes para forzar el negro
+  const labelStyle = { color: 'black', fontWeight: '600' };
+  const inputStyle = { border: '1px solid black', color: 'black' };
+  const groupTextStyle = { border: '1px solid black', borderColor: 'black', backgroundColor: '#e9ecef', color: 'black', fontWeight: '600' };
+
   // Cargar los cursos que el profesor puede administrar
   useEffect(() => {
-    // Reutilizamos el endpoint /api/cursos que ya filtra por rol
     apiFetch('/api/cursos')
       .then(data => {
         setCursos(data);
-        // Si solo tiene un curso, seleccionarlo por defecto
         if (data.length === 1) {
           setIdCurso(data[0].id);
         }
@@ -63,7 +66,6 @@ export default function CrearEncuestaPage() {
     setLoading(true);
     setError(null);
 
-    // Validar
     if (preguntas.some(p => p.texto.trim() === '')) {
       setError("El texto de todas las preguntas es obligatorio.");
       setLoading(false);
@@ -77,12 +79,12 @@ export default function CrearEncuestaPage() {
           idCurso: parseInt(idCurso),
           titulo,
           descripcion,
-          preguntas // El backend espera este array
+          preguntas
         })
       });
 
       alert('Encuesta creada exitosamente.');
-      navigate('/dashboard/encuestas'); // Redirigir a la lista
+      navigate('/dashboard/encuestas');
 
     } catch (err) {
       setError(err.message);
@@ -91,15 +93,15 @@ export default function CrearEncuestaPage() {
   };
 
   return (
-    <div>
-      <Link to="/dashboard/encuestas" className="btn btn-outline-secondary mb-3">
+    <div style={{ fontFamily: 'sans-serif' }}>
+      <Link to="/dashboard/encuestas" className="btn btn-outline-secondary mb-3" style={{ color: 'black', borderColor: 'black' }}>
         <ArrowLeft className="me-2" />
         Volver a Encuestas
       </Link>
 
-      <Card>
-        <Card.Header>
-          <Card.Title as="h2" className="m-0">
+      <Card className="shadow-sm border-0">
+        <Card.Header className="bg-white border-bottom-0 pt-4">
+          <Card.Title as="h2" className="m-0 fw-bold text-dark">
             Crear Nueva Encuesta
           </Card.Title>
         </Card.Header>
@@ -107,23 +109,25 @@ export default function CrearEncuestaPage() {
           <Form onSubmit={handleSubmit}>
             {/* --- Info General --- */}
             <Form.Group className="mb-3" controlId="tituloEncuesta">
-              <Form.Label>Título de la Encuesta*</Form.Label>
+              <Form.Label style={labelStyle}>Título de la Encuesta*</Form.Label>
               <Form.Control
                 type="text"
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
                 required
                 disabled={loading}
+                style={inputStyle}
               />
             </Form.Group>
 
             <Form.Group className="mb-3" controlId="idCursoEncuesta">
-              <Form.Label>Curso*</Form.Label>
+              <Form.Label style={labelStyle}>Curso*</Form.Label>
               <Form.Select
                 value={idCurso}
                 onChange={(e) => setIdCurso(e.target.value)}
                 required
                 disabled={loading || cursos.length === 0}
+                style={inputStyle}
               >
                 <option value="">
                   {cursos.length === 0 ? "Cargando cursos..." : "Selecciona un curso"}
@@ -137,7 +141,7 @@ export default function CrearEncuestaPage() {
             </Form.Group>
 
             <Form.Group className="mb-3" controlId="descripcionEncuesta">
-              <Form.Label>Descripción (Opcional)</Form.Label>
+              <Form.Label style={labelStyle}>Descripción (Opcional)</Form.Label>
               <Form.Control
                 as="textarea"
                 rows={2}
@@ -145,19 +149,20 @@ export default function CrearEncuestaPage() {
                 onChange={(e) => setDescripcion(e.target.value)}
                 disabled={loading}
                 placeholder="Instrucciones para los alumnos..."
+                style={inputStyle}
               />
             </Form.Group>
 
-            <hr />
+            <hr className="my-4" style={{ borderTop: '2px solid #000' }} />
 
             {/* --- Preguntas Dinámicas --- */}
-            <h4 className="mb-3">Preguntas</h4>
+            <h4 className="mb-3 fw-bold text-dark">Preguntas</h4>
 
             {preguntas.map((pregunta, index) => (
-              <Card key={index} className="mb-3 bg-light">
+              <Card key={index} className="mb-3" style={{ border: '1px solid #000', backgroundColor: '#f8f9fa' }}>
                 <Card.Body>
                   <div className="d-flex justify-content-between align-items-center mb-2">
-                    <Form.Label className="mb-0 fw-bold">Pregunta {index + 1}</Form.Label>
+                    <Form.Label className="mb-0 fw-bold" style={{ color: 'black' }}>Pregunta {index + 1}</Form.Label>
                     {preguntas.length > 1 && (
                       <Button variant="danger" size="sm" onClick={() => removePregunta(index)}>
                         <Trash />
@@ -166,21 +171,23 @@ export default function CrearEncuestaPage() {
                   </div>
 
                   <InputGroup className="mb-2">
-                    <InputGroup.Text>Texto:</InputGroup.Text>
+                    <InputGroup.Text style={groupTextStyle}>Texto:</InputGroup.Text>
                     <Form.Control
                       type="text"
                       placeholder="Ej: El profesor explica con claridad"
                       value={pregunta.texto}
                       onChange={(e) => handlePreguntaChange(index, 'texto', e.target.value)}
                       required
+                      style={inputStyle}
                     />
                   </InputGroup>
 
                   <InputGroup>
-                    <InputGroup.Text>Tipo:</InputGroup.Text>
+                    <InputGroup.Text style={groupTextStyle}>Tipo:</InputGroup.Text>
                     <Form.Select
                       value={pregunta.tipo_pregunta}
                       onChange={(e) => handlePreguntaChange(index, 'tipo_pregunta', e.target.value)}
+                      style={inputStyle}
                     >
                       <option value="escala_1_5">Escala 1 a 5 (Muy en desacuerdo a Muy de acuerdo)</option>
                       <option value="texto_libre">Respuesta Abierta</option>
@@ -190,7 +197,7 @@ export default function CrearEncuestaPage() {
               </Card>
             ))}
 
-            <Button variant="outline-primary" onClick={addPregunta} disabled={loading} className="mb-3">
+            <Button variant="outline-dark" onClick={addPregunta} disabled={loading} className="mb-3 fw-bold border-2">
               <PlusLg className="me-2" />
               Añadir Pregunta
             </Button>
@@ -198,7 +205,7 @@ export default function CrearEncuestaPage() {
             {error && <Alert variant="danger" className="mt-4">{error}</Alert>}
 
             <div className="text-end mt-4">
-              <Button type="submit" variant="success" size="lg" disabled={loading || !idCurso}>
+              <Button type="submit" variant="success" size="lg" disabled={loading || !idCurso} className="fw-bold px-5">
                 {loading ? (
                   <Spinner as="span" animation="border" size="sm" />
                 ) : (

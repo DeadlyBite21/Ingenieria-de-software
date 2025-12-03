@@ -349,10 +349,58 @@ router.get('/incidentes/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Actualizar incidente (Agregar suceso y cambiar estado)
 router.patch('/incidentes/:id', authenticateToken, async (req, res) => {
-  if (req.user.rol === 2) return res.status(403).json({ error: "Sin permisos" });
-  // Implementación simplificada para actualizar estado o agregar historial
-  res.json({ message: "Incidente actualizado (simulado)" });
+  const { id } = req.params;
+  const { nuevoSuceso } = req.body; // El frontend envía { nuevoSuceso: { ... } }
+
+  // Validaciones de permiso
+  if (req.user.rol === 2) {
+    return res.status(403).json({ error: "No tienes permisos para editar incidentes." });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Si viene un nuevo suceso, lo agregamos al historial Y actualizamos el estado general
+    if (nuevoSuceso) {
+      // Preparamos el objeto del suceso con datos de auditoría
+      const sucesoData = {
+        ...nuevoSuceso,
+        fecha: new Date().toISOString(),
+        reportado_por: req.user.nombre // Guardamos quién hizo la actualización
+      };
+
+      // Query compleja:
+      // 1. COALESCE(historial, '[]'): Si es null, usa array vacío.
+      // 2. || : Concatena el nuevo suceso al array jsonb.
+      // 3. También actualizamos el 'estado' general del incidente al estado de este nuevo suceso.
+      await client.query(
+        `UPDATE incidentes
+         SET 
+            historial = COALESCE(historial, '[]'::jsonb) || $1::jsonb,
+            estado = $2,
+            actualizado_en = NOW()
+         WHERE id = $3`,
+        [JSON.stringify([sucesoData]), nuevoSuceso.estado, id]
+      );
+
+      await client.query('COMMIT');
+      return res.json({ message: "Nuevo suceso registrado correctamente" });
+    }
+
+    // Si llegamos aquí, no se envió nada válido
+    await client.query('ROLLBACK');
+    res.status(400).json({ error: "No se enviaron datos para actualizar." });
+
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error("Error en PATCH incidente:", e);
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
 });
 
 // ================== ENCUESTAS ==================
