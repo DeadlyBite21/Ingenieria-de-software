@@ -1,8 +1,7 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
-import fetch from "node-fetch";
 import pkg from "pg";
-import bcrypt from "bcryptjs"; // para encriptar contraseñas
+import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -10,10 +9,9 @@ const { Pool } = pkg;
 
 const router = Router();
 
-// Pool de conexión a Neon / Postgres
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Necesario en Neon
+  ssl: { rejectUnauthorized: false }
 });
 
 // ================== MIDDLEWARES ==================
@@ -21,7 +19,6 @@ const pool = new Pool({
 function authenticateToken(req, res, next) {
   const header = req.headers.authorization;
   const token = header && header.split(" ")[1];
-
   if (!token) return res.status(401).json({ error: "Token requerido" });
 
   jwt.verify(token, process.env.JWT_SECRET || "secreto123", (err, user) => {
@@ -31,7 +28,6 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Middleware para verificar si el usuario es Administrador
 function isAdmin(req, res, next) {
   if (req.user.rol !== 0) {
     return res.status(403).json({ error: "Acceso denegado. Se requiere rol de Administrador." });
@@ -68,46 +64,28 @@ const checkSolapamiento = async (psicologo_id, start, end, excludeCitaId = null)
 
 // ================== RUTAS PÚBLICAS ==================
 
-// Ruta de prueba
-router.get("/", (req, res) => {
-  res.send("API conectada a Neon");
-});
+router.get("/", (req, res) => res.send("API conectada a Neon 🚀"));
 
-// Login con bloqueo de seguridad
 router.post("/login", async (req, res) => {
   const { identificador, contrasena } = req.body;
   if (!identificador || !contrasena) return res.status(400).json({ error: "Falta rut o contraseña" });
 
   try {
-    // 1. Buscar usuario
-    const result = await pool.query(
-      "SELECT * FROM usuarios WHERE rut::text = $1 OR correo = $1", 
-      [identificador]
-    );
-
-    if (result.rows.length === 0)
-      return res.status(401).json({ error: "Usuario no encontrado" });
+    const result = await pool.query("SELECT * FROM usuarios WHERE rut::text = $1 OR correo = $1", [identificador]);
+    if (result.rows.length === 0) return res.status(401).json({ error: "Usuario no encontrado" });
 
     const usuario = result.rows[0];
 
-    // 2. VERIFICAR SI ESTÁ BLOQUEADO
+    // Verificar bloqueo
     if (usuario.bloqueado_hasta) {
-        const ahora = new Date();
-        const bloqueo = new Date(usuario.bloqueado_hasta);
-        
-        if (ahora < bloqueo) {
-            // Calcular minutos restantes
-            const minutosRestantes = Math.ceil((bloqueo - ahora) / 60000);
-            return res.status(403).json({ 
-                error: `Cuenta bloqueada por demasiados intentos. Intente nuevamente en ${minutosRestantes} minutos.` 
-            });
-        } else {
-            // El tiempo ya pasó, reseteamos (opcionalmente aquí o al login exitoso)
-            // Dejamos que fluya, se reseteará si acierta la clave abajo.
-        }
+      const ahora = new Date();
+      const bloqueo = new Date(usuario.bloqueado_hasta);
+      if (ahora < bloqueo) {
+        const minutosRestantes = Math.ceil((bloqueo - ahora) / 60000);
+        return res.status(403).json({ error: `Cuenta bloqueada. Intente en ${minutosRestantes} minutos.` });
+      }
     }
 
-    // 3. Verificar Contraseña
     let validPassword = false;
     if (usuario.contrasena?.startsWith?.('$2b$')) {
       validPassword = await bcrypt.compare(contrasena, usuario.contrasena);
@@ -115,221 +93,137 @@ router.post("/login", async (req, res) => {
       validPassword = String(usuario.contrasena).trim() === contrasena;
     }
 
-    // 4. MANEJO DE INTENTOS
     if (!validPassword) {
-        const nuevosIntentos = (usuario.intentos_fallidos || 0) + 1;
-        
-        if (nuevosIntentos >= 3) {
-            // BLOQUEAR POR 15 MINUTOS
-            const tiempoBloqueo = new Date(Date.now() + 15 * 60 * 1000); // 15 min
-            await pool.query(
-                "UPDATE usuarios SET intentos_fallidos = $1, bloqueado_hasta = $2 WHERE id = $3",
-                [nuevosIntentos, tiempoBloqueo, usuario.id]
-            );
-            return res.status(403).json({ error: "Has excedido los 3 intentos. Cuenta bloqueada por 15 minutos." });
-        } else {
-            // SOLO SUMAR INTENTO
-            await pool.query(
-                "UPDATE usuarios SET intentos_fallidos = $1 WHERE id = $2",
-                [nuevosIntentos, usuario.id]
-            );
-            const restantes = 3 - nuevosIntentos;
-            return res.status(401).json({ error: `Contraseña incorrecta. Te quedan ${restantes} intentos.` });
-        }
+      const nuevosIntentos = (usuario.intentos_fallidos || 0) + 1;
+      if (nuevosIntentos >= 3) {
+        const tiempoBloqueo = new Date(Date.now() + 15 * 60 * 1000);
+        await pool.query("UPDATE usuarios SET intentos_fallidos = $1, bloqueado_hasta = $2 WHERE id = $3", [nuevosIntentos, tiempoBloqueo, usuario.id]);
+        return res.status(403).json({ error: "Has excedido los 3 intentos. Cuenta bloqueada por 15 minutos." });
+      } else {
+        await pool.query("UPDATE usuarios SET intentos_fallidos = $1 WHERE id = $2", [nuevosIntentos, usuario.id]);
+        return res.status(401).json({ error: `Contraseña incorrecta. Te quedan ${3 - nuevosIntentos} intentos.` });
+      }
     }
 
-    // 5. ÉXITO: Resetear contadores
-    await pool.query(
-        "UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = $1",
-        [usuario.id]
-    );
+    await pool.query("UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = $1", [usuario.id]);
 
-    const token = jwt.sign(
-      { id: usuario.id, rut: usuario.rut, rol: usuario.rol },
-      process.env.JWT_SECRET || "secreto123",
-      { expiresIn: "1h" }
-    );
+    const token = jwt.sign({ id: usuario.id, rut: usuario.rut, rol: usuario.rol }, process.env.JWT_SECRET || "secreto123", { expiresIn: "1h" });
 
     res.json({
       message: "Inicio de sesión exitoso",
-      usuario: {
-        id: usuario.id,
-        rut: usuario.rut,
-        nombre: usuario.nombre,
-        correo: usuario.correo,
-        rol: usuario.rol,
-      },
+      usuario: { id: usuario.id, rut: usuario.rut, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol },
       token,
     });
-
   } catch (err) {
-    console.error("Error en login:", err);
+    console.error("Error login:", err);
     res.status(500).json({ error: "Error en el servidor" });
   }
 });
 
-// ================== RUTA DE PERFIL ==================
-
-// Obtener perfil del usuario logueado (usado por AuthContext)
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query("SELECT id, rut, nombre, correo, rol FROM usuarios WHERE id = $1", [req.user.id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Usuario no encontrado" });
-    }
+    if (result.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("Error en /me:", err);
     res.status(500).json({ error: "Error en el servidor" });
   }
 });
 
-// ================== USUARIOS (Admin) ==================
+router.post("/recover-password", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email requerido" });
+  // Lógica de envío de correo simulada
+  res.json({ message: "Correo de recuperación enviado (simulado)" });
+});
 
-// Obtener todos los usuarios (Solo Admin)
+router.post("/reset-password", async (req, res) => {
+  const { token, nuevaContrasena } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(nuevaContrasena, 10);
+    // Aquí iría la validación real del token y actualización
+    res.json({ message: "Contraseña actualizada (simulado)" });
+  } catch (e) {
+    res.status(500).json({ error: "Error al resetear password" });
+  }
+});
+
+// ================== USUARIOS ==================
+
 router.get("/usuarios", authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await pool.query("SELECT id, rut, nombre, correo, rol FROM usuarios ORDER BY id");
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: "Error en la consulta" });
   }
 });
 
-// Crear usuario (Solo Admin)
 router.post("/usuarios/crear", authenticateToken, isAdmin, async (req, res) => {
-  // Usamos 'contrasena' para coincidir con el frontend
   const { rol, rut, nombre, correo, contrasena } = req.body;
-  //Roles 0: administrador, 1: profesor, 2: alumno, 3: psicologo
   if (![0, 1, 2, 3].includes(rol) || !rut || !nombre || !correo || !contrasena) {
-    return res.status(400).json({ error: "Faltan datos o el rol es inválido" });
+    return res.status(400).json({ error: "Faltan datos o rol inválido" });
   }
-if(contrasena.length < 6) {
-  return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
-}
-for(let i = 0; i < contrasena.length; i++) {
-  if(contrasena[i] === ' ') {
-    return res.status(400).json({ error: "La contraseña no puede contener espacios" });
-  }
-}
-const specialCharRegex = /[%&\$#@!]/;
-//Comprueba si la contraseña NO contiene (.test() da false) ninguno de esos caracteres.
-if (!specialCharRegex.test(contrasena)) {
-  // 3. Si no encontró ninguno, retorna el error.
-  return res.status(400).json({ error: "La contraseña debe contener al menos un carácter especial (%&$#@!)" });
-}
+  if (contrasena.length < 6) return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+  if (contrasena.includes(' ')) return res.status(400).json({ error: "La contraseña no puede contener espacios" });
+  if (!/[%&\$#@!]/.test(contrasena)) return res.status(400).json({ error: "Falta un carácter especial (%&$#@!)" });
 
   try {
     const hashedPassword = await bcrypt.hash(contrasena, 10);
     const result = await pool.query(
-      // Guardamos en la columna 'contrasena' de la BD
       "INSERT INTO usuarios (rol, rut, nombre, correo, contrasena) VALUES ($1, $2, $3, $4, $5) RETURNING id, rut, nombre, correo, rol",
       [rol, rut, nombre, correo, hashedPassword]
     );
-
     res.status(201).json(result.rows[0]);
-  } catch (err)
- {
-    if (err.code === "23505") { // Error de constraint único
-      if (err.constraint === "usuarios_rut_key") {
-        return res.status(400).json({ error: "El RUT ya está registrado" });
-      }
-      if (err.constraint === "usuarios_correo_key") {
-        return res.status(400).json({ error: "El correo ya está registrado" });
-      }
-    }
-    console.error("Error en crear usuario:", err);
+  } catch (err) {
+    if (err.code === "23505") return res.status(400).json({ error: "RUT o Correo ya registrado" });
     res.status(500).json({ error: "Error al insertar usuario" });
   }
 });
 
-// Eliminar un usuario (Solo Admin)
 router.delete("/usuarios/:id", authenticateToken, isAdmin, async (req, res) => {
   const { id } = req.params;
-
-  // Evitar que un admin se borre a sí mismo
-  if (parseInt(req.user.id, 10) === parseInt(id, 10)) {
-    return res.status(400).json({ error: "No puedes eliminarte a ti mismo." });
-  }
+  if (parseInt(req.user.id) === parseInt(id)) return res.status(400).json({ error: "No puedes eliminarte a ti mismo." });
 
   const client = await pool.connect();
-
   try {
     await client.query("BEGIN");
-    
-    // 1. Eliminar relaciones en curso_usuarios
     await client.query("DELETE FROM curso_usuarios WHERE usuario_id = $1", [id]);
-    
-    // 2. Anonimizar incidentes creados por el usuario (o eliminar, según prefieras)
-    // Aquí los desasignamos para mantener el historial:
     await client.query("UPDATE incidentes SET creado_por = NULL WHERE creado_por = $1", [id]);
-    
-    // 3. Eliminar al usuario
-    const result = await client.query("DELETE FROM usuarios WHERE id = $1 RETURNING id, rut, nombre", [id]);
-    
+    const result = await client.query("DELETE FROM usuarios WHERE id = $1 RETURNING id", [id]);
     await client.query("COMMIT");
-    
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Usuario no encontrado" });
-    }
-    
-    res.json({ message: "Usuario eliminado exitosamente", usuario: result.rows[0] });
+    if (result.rowCount === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+    res.json({ message: "Usuario eliminado" });
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Error al eliminar usuario:", err);
-    res.status(500).json({ error: "Error en el servidor al eliminar usuario" });
+    res.status(500).json({ error: "Error al eliminar usuario" });
   } finally {
     client.release();
   }
 });
 
-// Cambiar contraseña (Asumimos que solo Admin puede cambiar la de otros)
-router.post("/usuarios/cambiar-contraseña", authenticateToken, isAdmin, async (req, res) => {
-  const { id, nuevaContraseña } = req.body;
-  if (!id || !nuevaContraseña) return res.status(400).json({ error: "Faltan datos" });
-
+// Conteo de alumnos por curso (Optimizado)
+router.get('/cursos/conteo-alumnos', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const hashedPassword = await bcrypt.hash(nuevaContraseña, 10);
+    // Contamos solo usuarios con rol 2 (Alumnos) en cada curso
     const result = await pool.query(
-      "UPDATE usuarios SET contrasena = $1 WHERE id = $2 RETURNING id, rut, nombre", // columna 'contrasena'
-      [hashedPassword, id]
+      `SELECT cu.curso_id, COUNT(*)::int AS total 
+       FROM curso_usuarios cu
+       JOIN usuarios u ON cu.usuario_id = u.id
+       WHERE u.rol = 2
+       GROUP BY cu.curso_id`
     );
-
-    if (result.rows.length === 0)
-      return res.status(404).json({ error: "Usuario no encontrado" });
-
-    res.json({
-      message: "Contraseña actualizada con éxito",
-      usuario: result.rows[0],
+    const stats = {};
+    result.rows.forEach(r => {
+      stats[r.curso_id] = r.total;
     });
-  } catch (err) {
-    console.error("Error al cambiar contraseña:", err);
-    res.status(500).json({ error: "Error en el servidor" });
+    res.json(stats);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
-
 // ================== CURSOS ==================
 
-// Crear curso (Solo Admin)
-router.post("/cursos/crear", authenticateToken, isAdmin, async (req, res) => {
-  const { nombre } = req.body;
-  if (!nombre) return res.status(400).json({ error: "Falta el nombre del curso" });
-
-  try {
-    const result = await pool.query(
-      "INSERT INTO cursos (nombre) VALUES ($1) RETURNING *",
-      [nombre]
-    );
-    res.status(201).json({ message: "Curso creado con éxito", curso: result.rows[0] });
-  } catch (err) {
-    if (err.code === "23505") return res.status(400).json({ error: "El curso ya existe" });
-    console.error(err);
-    res.status(500).json({ error: "Error en el servidor" });
-  }
-});
-
-// Obtener cursos (Para todos los usuarios logueados)
 router.get("/cursos", authenticateToken, async (req, res) => {
   try {
     // Si es admin, ve todos los cursos
@@ -337,762 +231,314 @@ router.get("/cursos", authenticateToken, async (req, res) => {
       const result = await pool.query("SELECT * FROM cursos ORDER BY id");
       return res.json(result.rows);
     }
-    
-    // Si es profesor (1) o alumno (2), ve solo sus cursos asignados
     const result = await pool.query(
-      `SELECT c.* FROM cursos c
-       JOIN curso_usuarios cu ON c.id = cu.curso_id
-       WHERE cu.usuario_id = $1
-       ORDER BY c.id`,
+      `SELECT c.* FROM cursos c JOIN curso_usuarios cu ON c.id = cu.curso_id WHERE cu.usuario_id = $1 ORDER BY c.id`,
       [req.user.id]
     );
     res.json(result.rows);
-    
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: "Error al obtener cursos" });
   }
 });
 
-// Eliminar un curso (Solo Admin)
+router.post("/cursos/crear", authenticateToken, isAdmin, async (req, res) => {
+  const { nombre } = req.body;
+  try {
+    const result = await pool.query("INSERT INTO cursos (nombre) VALUES ($1) RETURNING *", [nombre]);
+    res.status(201).json({ message: "Curso creado", curso: result.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: "Error al crear curso" });
+  }
+});
+
 router.delete("/cursos/:id", authenticateToken, isAdmin, async (req, res) => {
   const { id } = req.params;
-  const client = await pool.connect(); // Usar transacción
-
+  const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    
-    // 1. Eliminar relaciones en curso_usuarios
     await client.query("DELETE FROM curso_usuarios WHERE curso_id = $1", [id]);
-    
-    // 2. Eliminar incidentes relacionados
     await client.query("DELETE FROM incidentes WHERE id_curso = $1", [id]);
-    
-    // 3. Eliminar el curso
-    const result = await client.query("DELETE FROM cursos WHERE id = $1 RETURNING *", [id]);
-    
+    await client.query("DELETE FROM cursos WHERE id = $1", [id]);
     await client.query("COMMIT");
-    
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Curso no encontrado" });
-    }
-    
-    res.json({ message: "Curso y sus relaciones eliminados exitosamente", curso: result.rows[0] });
-  } catch (err) {
+    res.json({ message: "Curso eliminado" });
+  } catch (e) {
     await client.query("ROLLBACK");
-    console.error("Error al eliminar curso:", err);
-    res.status(500).json({ error: "Error en el servidor al eliminar el curso" });
+    res.status(500).json({ error: "Error al eliminar curso" });
+  } finally {
+    client.release();
   }
 });
 
-// Asignar usuario a curso (Solo Admin)
 router.post("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin, async (req, res) => {
   const { cursoId, usuarioId } = req.params;
-
   try {
-    const userCheck = await pool.query("SELECT * FROM usuarios WHERE id = $1", [usuarioId]);
-    if (userCheck.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+    const u = await pool.query("SELECT rol FROM usuarios WHERE id = $1", [usuarioId]);
+    if (u.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+    if (u.rows[0].rol === 0 || u.rows[0].rol === 3) return res.status(400).json({ error: "Rol no asignable a curso" });
 
-    const usuario = userCheck.rows[0];
-    // Admin (rol 0) no se asigna a cursos
-    if (usuario.rol === 0) {
-       return res.status(400).json({ error: "Los Administradores no se asignan a cursos" });
-    }
-    if(usuario.rol === 3) {
-        return res.status(400).json({ error: "Los Psicólogos no se asignan a cursos" });
-    }
-
-    const result = await pool.query(
-      "INSERT INTO curso_usuarios (usuario_id, curso_id) VALUES ($1, $2) RETURNING *",
-      [usuarioId, cursoId]
-    );
-
-    res.json({ message: "Usuario asignado al curso con éxito", asignacion: result.rows[0] });
-  } catch (err) {
-    if (err.code === "23505") return res.status(400).json({ error: "El usuario ya está en este curso" });
-    console.error(err);
-    res.status(500).json({ error: "Error en el servidor" });
+    await pool.query("INSERT INTO curso_usuarios (usuario_id, curso_id) VALUES ($1, $2)", [usuarioId, cursoId]);
+    res.json({ message: "Usuario asignado" });
+  } catch (e) {
+    res.status(500).json({ error: "Error al asignar" });
   }
 });
 
-// Desasignar usuario de curso (Solo Admin)
 router.delete("/cursos/:cursoId/usuarios/:usuarioId", authenticateToken, isAdmin, async (req, res) => {
   const { cursoId, usuarioId } = req.params;
-
   try {
-    const result = await pool.query(
-      "DELETE FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2 RETURNING *",
-      [usuarioId, cursoId]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Asignación no encontrada" });
-    }
-
-    res.json({ message: "Usuario desasignado del curso con éxito" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en el servidor" });
+    await pool.query("DELETE FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2", [usuarioId, cursoId]);
+    res.json({ message: "Usuario desasignado" });
+  } catch (e) {
+    res.status(500).json({ error: "Error al desasignar" });
   }
 });
 
-// Obtener usuarios de un curso (Admin)
-router.get("/cursos/:cursoId/usuarios", authenticateToken, isAdmin, async (req, res) => {
+// Obtener usuarios de un curso (Admin, Profesores y Psicólogos)
+router.get("/cursos/:cursoId/usuarios", authenticateToken, async (req, res) => {
   const { cursoId } = req.params;
+  // Permitimos Admin(0), Profesor(1), Psicólogo(3)
+  if (![0, 1, 3].includes(req.user.rol)) return res.status(403).json({ error: "Acceso denegado." });
+
   try {
+    if (req.user.rol === 1) {
+      const check = await pool.query("SELECT 1 FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2", [req.user.id, cursoId]);
+      if (check.rowCount === 0) return res.status(403).json({ error: "No tienes acceso a este curso." });
+    }
     const result = await pool.query(
-      `SELECT u.id, u.nombre, u.rut, u.rol 
-       FROM usuarios u
-       JOIN curso_usuarios cu ON u.id = cu.usuario_id
-       WHERE cu.curso_id = $1`,
+      `SELECT u.id, u.nombre, u.rut, u.rol FROM usuarios u JOIN curso_usuarios cu ON u.id = cu.usuario_id WHERE cu.curso_id = $1`,
       [cursoId]
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al obtener usuarios del curso" });
+    res.status(500).json({ error: "Error al obtener usuarios" });
   }
 });
-
 
 // ===================== INCIDENTES =====================
 
-// Validación de payload de incidente
-function assertIncidentePayload(body) {
-  const errors = [];
-  const required = ["idCurso", "tipo", "severidad", "descripcion"];
-  for (const k of required) if (!body[k]) errors.push(`Falta ${k}`);
-  if ((body.descripcion || "").length < 10) errors.push("La descripción debe tener al menos 10 caracteres");
-  if (errors.length) { const e = new Error("Payload inválido"); e.code = 400; e.details = errors; throw e; }
-}
-
-// Crear incidente (Protegido)
-router.post('/incidentes', authenticateToken, async (req, res) => {
+// --- NUEVO ENDPOINT: CONTEO (Debe ir ANTES de /incidentes/:id) ---
+router.get('/incidentes/conteo', authenticateToken, isAdmin, async (req, res) => {
   try {
-    assertIncidentePayload(req.body);
-    const {
-      alumnos = [],                // [id_usuario, ...]
-      idCurso,                     // número (columna real: id_curso)
-      tipo,
-      severidad,
-      descripcion,
-      lugar = null,
-      fecha = new Date().toISOString(),
-      participantes = [],          // [{nombre, rol}]
-      medidas = [],                // [{texto, ...}]
-      adjuntos = [],               // [{url, label}]
-      estado = "abierto"
-    } = req.body;
-
-    // Si es profesor (rol=1) debe pertenecer al curso
-    if (req.user?.rol === 1) {
-      const check = await pool.query(
-        `SELECT 1 FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2`,
-        [req.user.id, idCurso]
-      );
-      if (check.rowCount === 0) {
-        return res.status(403).json({ error: "No puedes registrar incidentes en un curso que no te corresponde." });
-      }
-    }
-    // Si es Alumno (rol=2), no puede crear incidentes
-    if (req.user?.rol === 2) {
-        return res.status(403).json({ error: "No tienes permisos para crear incidentes." });
-    }
-    // Admin (rol=0) puede crear en cualquier curso
-
-    const ins = await pool.query(
-      `INSERT INTO incidentes
-        (alumnos, id_curso, tipo, severidad, descripcion, lugar, fecha, participantes, medidas, adjuntos, estado, creado_por, creado_en, actualizado_en)
-       VALUES
-        ($1,      $2,       $3,   $4,        $5,          $6,    $7,    $8,            $9,      $10,      $11,    $12,        NOW(),      NOW())
-       RETURNING *`,
-      [
-        JSON.stringify(alumnos),
-        idCurso,
-        tipo,
-        severidad,
-        descripcion,
-        lugar,
-        fecha,
-        JSON.stringify(participantes),
-        JSON.stringify(medidas),
-        JSON.stringify(adjuntos),
-        estado,
-        req.user?.id || null
-      ]
+    const result = await pool.query(
+      'SELECT id_curso, COUNT(*)::int AS total FROM incidentes GROUP BY id_curso'
     );
-
-    res.status(201).json({ message: "Incidente creado", data: ins.rows[0] });
+    const stats = {};
+    result.rows.forEach(r => {
+      stats[r.id_curso] = r.total;
+    });
+    res.json(stats);
   } catch (e) {
-    res.status(e.code || 500).json({ error: e.message, details: e.details });
+    res.status(500).json({ error: e.message });
   }
 });
+// -------------------------------------------------------------
 
-// Listar incidentes (filtros + paginación) (Protegido)
 router.get('/incidentes', authenticateToken, async (req, res) => {
   try {
-    const { idCurso, idAlumno, estado, from, to, page = 1, limit = 10 } = req.query;
-
-    const where = [];
+    const { idCurso, estado } = req.query;
     const values = [];
+    let where = [];
     let i = 1;
-
-    if (idCurso)  { where.push(`id_curso = $${i++}`); values.push(+idCurso); }
-    if (estado)   { where.push(`estado = $${i++}`);   values.push(estado); }
-    if (idAlumno) { where.push(`alumnos @> $${i++}::jsonb`); values.push(JSON.stringify([+idAlumno])); }
-    if (from)     { where.push(`fecha >= $${i++}`);   values.push(new Date(from)); }
-    if (to)       { where.push(`fecha <= $${i++}`);   values.push(new Date(to)); }
-
-    // Profesor (rol=1): limitar a cursos donde participa
-    if (req.user?.rol === 1) {
-      where.push(`id_curso IN (SELECT curso_id FROM curso_usuarios WHERE usuario_id = $${i++})`);
-      values.push(req.user.id);
-    }
-    // Alumno (rol=2): limitar a incidentes donde esté involucrado
-    if (req.user?.rol === 2) {
-      where.push(`alumnos @> $${i++}::jsonb`);
-      values.push(JSON.stringify([req.user.id]));
-    }
-    // Admin (rol=0) ve todo
+    if (idCurso) { where.push(`id_curso = $${i++}`); values.push(idCurso); }
+    if (estado) { where.push(`estado = $${i++}`); values.push(estado); }
 
     const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
-    const offset = (Number(page) - 1) * Number(limit);
-
-    const q = `
-      SELECT * FROM incidentes
-      ${whereSQL}
-      ORDER BY fecha DESC
-      LIMIT ${Number(limit)} OFFSET ${offset}
-    `;
-    const qCount = `SELECT COUNT(*)::int AS total FROM incidentes ${whereSQL}`;
-
-    const [rows, count] = await Promise.all([
-      pool.query(q, values),
-      pool.query(qCount, values),
-    ]);
-
-    res.json({ data: rows.rows, total: count.rows[0].total, page: Number(page), limit: Number(limit) });
+    const result = await pool.query(`SELECT * FROM incidentes ${whereSQL} ORDER BY fecha DESC`, values);
+    res.json({ data: result.rows, total: result.rowCount });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Error al listar incidentes" });
   }
 });
 
-// Detalle por ID (Protegido)
-router.get('/incidentes/:id', authenticateToken, async (req, res) => {
+router.post('/incidentes', authenticateToken, async (req, res) => {
+  if (req.user.rol === 2) return res.status(403).json({ error: "Sin permisos" });
+  const { idCurso, tipo, severidad, descripcion, lugar, fecha, alumnos } = req.body;
   try {
-    const { id } = req.params;
-    const r = await pool.query(`SELECT * FROM incidentes WHERE id = $1`, [id]);
-    if (r.rowCount === 0) return res.status(404).json({ error: "No encontrado" });
-
-    const incidente = r.rows[0];
-
-    // Profesor (rol=1): verificar que pertenece al curso
-    if (req.user?.rol === 1) {
-      const check = await pool.query(
-        `SELECT 1 FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2`,
-        [req.user.id, incidente.id_curso]
-      );
-      if (check.rowCount === 0) return res.status(403).json({ error: "Sin permisos" });
-    }
-    
-    // Alumno (rol=2): verificar que está en la lista de alumnos
-    if (req.user?.rol === 2) {
-      const esInvolucrado = (incidente.alumnos || []).includes(req.user.id);
-      if (!esInvolucrado) {
-        return res.status(403).json({ error: "Sin permisos" });
-      }
-    }
-    // Admin (rol=0) puede ver
-
-    res.json(incidente);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Actualizar incidente (parcial) (Protegido, solo Admin y Profesor)
-router.patch('/incidentes/:id', authenticateToken, async (req, res) => {
-  try {
-    // Alumnos (rol=2) no pueden editar
-    if (req.user?.rol === 2) {
-       return res.status(403).json({ error: "No tienes permisos para editar incidentes." });
-    }
-    
-    const { id } = req.params;
-
-    // Mapa payload → columnas
-    const map = {
-      idCurso: "id_curso",
-      tipo: "tipo",
-      severidad: "severidad",
-      descripcion: "descripcion",
-      lugar: "lugar",
-      fecha: "fecha",
-      estado: "estado",
-      alumnos: "alumnos",                 // jsonb
-      participantes: "participantes",     // jsonb
-      medidas: "medidas",                 // jsonb
-      adjuntos: "adjuntos"                // jsonb
-    };
-
-    const sets = [];
-    const values = [];
-    let i = 1;
-
-    for (const [k, col] of Object.entries(map)) {
-      if (k in req.body) {
-        if (["alumnos","participantes","medidas","adjuntos"].includes(k)) {
-          sets.push(`${col} = $${i++}::jsonb`);
-          values.push(JSON.stringify(req.body[k]));
-        } else {
-          sets.push(`${col} = $${i++}`);
-          values.push(req.body[k]);
-        }
-      }
-    }
-    if (sets.length === 0) return res.status(400).json({ error: "Nada para actualizar" });
-
-    // Profesor (rol=1): alcance por curso
-    if (req.user?.rol === 1) {
-      const check = await pool.query(`SELECT id_curso FROM incidentes WHERE id = $1`, [id]);
-      if (check.rowCount === 0) return res.status(404).json({ error: "No encontrado" });
-      const belongs = await pool.query(
-        `SELECT 1 FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2`,
-        [req.user.id, check.rows[0].id_curso]
-      );
-      if (belongs.rowCount === 0) return res.status(403).json({ error: "Sin permisos" });
-    }
-    // Admin (rol=0) puede editar
-
-    const sql = `
-      UPDATE incidentes
-         SET ${sets.join(", ")}, actualizado_en = NOW()
-       WHERE id = $${i}
-       RETURNING *
-    `;
-    values.push(id);
-
-    const upd = await pool.query(sql, values);
-    if (upd.rowCount === 0) return res.status(404).json({ error: "No encontrado" });
-
-    res.json({ message: "Incidente actualizado", data: upd.rows[0] });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ================== RECUPERACIÓN DE CONTRASEÑA ==================
-
-// Ruta para enviar correo de recuperación
-router.post("/recover-password", async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: "Email requerido" });
-
-  try {
-    const userResult = await pool.query("SELECT * FROM usuarios WHERE correo = $1", [email]);
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "Usuario no encontrado" });
-    }
-
-    const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: "15m" });
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-
-    console.log("Enviando correo a (simulado):", email);
-    console.log("URL de reseteo:", resetUrl);
-
-    // Simulación de n8n/webhook (ya que 'fetch' a localhost puede fallar en el servidor)
-    // try {
-    //   await fetch(process.env.N8N_WEBHOOK_URL, {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({ email, resetUrl }),
-    //   });
-    // } catch (err) {
-    //   console.error("Error al enviar correo con n8n:", err);
-    //   return res.status(500).json({ error: "No se pudo enviar el correo" });
-    // }
-    
-    // (Tu frontend no usa n8n, así que solo devolvemos éxito)
-
-    res.json({ message: "Correo de recuperación enviado correctamente" });
-  
-  } catch (err) {
-    console.error("Error en /recover-password:", err);
-    res.status(500).json({ error: "Error en el servidor" });
-  }
-});
-
-// Ruta para actualizar la contraseña con el token
-router.post("/reset-password", async (req, res) => {
-  const { token, nuevaContrasena } = req.body;
-  if (!token || !nuevaContrasena) {
-    return res.status(400).json({ error: "Faltan datos" });
-  }
-
-  let decoded;
-  try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
-  } catch (err) {
-    return res.status(403).json({ error: "Token inválido o expirado" });
-  }
-
-  try {
-    const { email } = decoded;
-    const hashedPassword = await bcrypt.hash(nuevaContrasena, 10);
-    
     const result = await pool.query(
-      "UPDATE usuarios SET contrasena = $1 WHERE correo = $2 RETURNING id",
-      [hashedPassword, email]
+      `INSERT INTO incidentes (id_curso, tipo, severidad, descripcion, lugar, fecha, alumnos, estado, creado_por, actualizado_en)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'abierto', $8, NOW()) RETURNING *`,
+      [idCurso, tipo, severidad, descripcion, lugar, fecha, JSON.stringify(alumnos), req.user.id]
     );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Usuario no encontrado" });
-    }
-
-    res.json({ message: "Contraseña actualizada con éxito" });
-  } catch (err) {
-    console.error("Error en /reset-password:", err);
-    res.status(500).json({ error: "Error en el servidor" });
+    res.status(201).json({ message: "Incidente creado", data: result.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: "Error al crear incidente" });
   }
 });
 
-// Listar todas las encuestas (para el usuario logueado)
+router.get('/incidentes/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query("SELECT * FROM incidentes WHERE id = $1", [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "No encontrado" });
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: "Error al obtener incidente" });
+  }
+});
+
+// Actualizar incidente (Agregar suceso y cambiar estado)
+router.patch('/incidentes/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { nuevoSuceso } = req.body; // El frontend envía { nuevoSuceso: { ... } }
+
+  // Validaciones de permiso
+  if (req.user.rol === 2) {
+    return res.status(403).json({ error: "No tienes permisos para editar incidentes." });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Si viene un nuevo suceso, lo agregamos al historial Y actualizamos el estado general
+    if (nuevoSuceso) {
+      // Preparamos el objeto del suceso con datos de auditoría
+      const sucesoData = {
+        ...nuevoSuceso,
+        fecha: new Date().toISOString(),
+        reportado_por: req.user.nombre // Guardamos quién hizo la actualización
+      };
+
+      // Query compleja:
+      // 1. COALESCE(historial, '[]'): Si es null, usa array vacío.
+      // 2. || : Concatena el nuevo suceso al array jsonb.
+      // 3. También actualizamos el 'estado' general del incidente al estado de este nuevo suceso.
+      await client.query(
+        `UPDATE incidentes
+         SET 
+            historial = COALESCE(historial, '[]'::jsonb) || $1::jsonb,
+            estado = $2,
+            actualizado_en = NOW()
+         WHERE id = $3`,
+        [JSON.stringify([sucesoData]), nuevoSuceso.estado, id]
+      );
+
+      await client.query('COMMIT');
+      return res.json({ message: "Nuevo suceso registrado correctamente" });
+    }
+
+    // Si llegamos aquí, no se envió nada válido
+    await client.query('ROLLBACK');
+    res.status(400).json({ error: "No se enviaron datos para actualizar." });
+
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error("Error en PATCH incidente:", e);
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ================== ENCUESTAS ==================
+
 router.get('/encuestas', authenticateToken, async (req, res) => {
   try {
-    let query;
-    // 1. INICIAMOS 'values' COMO UN ARRAY VACÍO
-    const values = []; 
-
-    if (req.user.rol === 0 || req.user.rol === 3) {
-      // Admin ve todas (Esta consulta no usa parámetros)
-      query = `SELECT e.*, c.nombre as nombre_curso 
-               FROM encuestas e
-               JOIN cursos c ON e.id_curso = c.id
-               ORDER BY e.fecha_creacion DESC`;
-      // No añadimos nada a 'values'
+    let query, values = [];
+    if ([0, 3].includes(req.user.rol)) {
+      query = `SELECT e.*, c.nombre as nombre_curso FROM encuestas e JOIN cursos c ON e.id_curso = c.id ORDER BY e.fecha_creacion DESC`;
     } else if (req.user.rol === 1) {
-      // Profesor ve las que creó
-      query = `SELECT e.*, c.nombre as nombre_curso 
-               FROM encuestas e
-               JOIN cursos c ON e.id_curso = c.id
-               WHERE e.creado_por = $1
-               ORDER BY e.fecha_creacion DESC`;
-      // 2. AÑADIMOS EL VALOR SOLO CUANDO SE NECESITA
-      values.push(req.user.id); 
+      query = `SELECT e.*, c.nombre as nombre_curso FROM encuestas e JOIN cursos c ON e.id_curso = c.id WHERE e.creado_por = $1 ORDER BY e.fecha_creacion DESC`;
+      values.push(req.user.id);
     } else {
-      // Alumno ve las de sus cursos
-      query = `SELECT e.*, c.nombre as nombre_curso 
-               FROM encuestas e
-               JOIN cursos c ON e.id_curso = c.id
-               WHERE e.estado = 'publicada' AND e.id_curso IN (
-                 SELECT curso_id FROM curso_usuarios WHERE usuario_id = $1
-               )
-               ORDER BY e.fecha_creacion DESC`;
-      // 3. AÑADIMOS EL VALOR SOLO CUANDO SE NECESITA
-      values.push(req.user.id); 
+      query = `SELECT e.*, c.nombre as nombre_curso FROM encuestas e JOIN cursos c ON e.id_curso = c.id WHERE e.estado = 'publicada' AND e.id_curso IN (SELECT curso_id FROM curso_usuarios WHERE usuario_id = $1) ORDER BY e.fecha_creacion DESC`;
+      values.push(req.user.id);
     }
-    
-    // Ahora la llamada es correcta:
-    // Si es Admin: pool.query(query, [])
-    // Si es Profesor/Alumno: pool.query(query, [userId])
     const result = await pool.query(query, values);
     res.json(result.rows);
-
   } catch (e) {
-    // También mejoramos el JSON de error para que sea más limpio
     res.status(500).json({ error: e.message });
   }
 });
 
-// Crear una nueva encuesta (Profesor o Admin)
 router.post('/encuestas', authenticateToken, async (req, res) => {
-  // Alumnos (rol 2) no pueden crear
-  if (req.user.rol === 2) {
-    return res.status(403).json({ error: "No tienes permisos para crear encuestas." });
-  }
-
+  if (req.user.rol === 2) return res.status(403).json({ error: "Sin permisos" });
   const { idCurso, titulo, descripcion, preguntas } = req.body;
-  
-  if (!idCurso || !titulo || !preguntas || preguntas.length === 0) {
-    return res.status(400).json({ error: "Faltan datos (idCurso, titulo, preguntas)" });
-  }
-
-  // Si es Profesor, verificar que el curso le pertenece
-  if (req.user.rol === 1) {
-    const check = await pool.query(
-      "SELECT 1 FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2",
-      [req.user.id, idCurso]
-    );
-    if (check.rowCount === 0) {
-      return res.status(403).json({ error: "No puedes crear encuestas para un curso que no administras." });
-    }
-  }
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
-    // 1. Insertar la encuesta
-    const encuestaRes = await client.query(
-      `INSERT INTO encuestas (id_curso, creado_por, titulo, descripcion, estado)
-       VALUES ($1, $2, $3, $4, 'publicada')
-       RETURNING id`,
+    const encRes = await client.query(
+      "INSERT INTO encuestas (id_curso, creado_por, titulo, descripcion, estado) VALUES ($1, $2, $3, $4, 'publicada') RETURNING id",
       [idCurso, req.user.id, titulo, descripcion]
     );
-    
-    const idEncuesta = encuestaRes.rows[0].id;
-    
-    // 2. Insertar las preguntas
-    const queryPreguntas = `
-      INSERT INTO preguntas (id_encuesta, texto, tipo_pregunta, orden)
-      VALUES ($1, $2, $3, $4)
-    `;
-    
+    const idEncuesta = encRes.rows[0].id;
     for (let i = 0; i < preguntas.length; i++) {
-      const p = preguntas[i];
-      if (!p.texto || !p.tipo_pregunta) throw new Error("Pregunta inválida.");
-      await client.query(queryPreguntas, [idEncuesta, p.texto, p.tipo_pregunta, i + 1]);
+      await client.query(
+        "INSERT INTO preguntas (id_encuesta, texto, tipo_pregunta, orden) VALUES ($1, $2, $3, $4)",
+        [idEncuesta, preguntas[i].texto, preguntas[i].tipo_pregunta, i + 1]
+      );
     }
-
     await client.query('COMMIT');
-    res.status(201).json({ message: "Encuesta creada exitosamente", idEncuesta });
-    
+    res.status(201).json({ message: "Encuesta creada" });
   } catch (e) {
     await client.query('ROLLBACK');
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Error al crear encuesta" });
   } finally {
     client.release();
   }
 });
 
-// Obtener preguntas de una encuesta específica (Para responder o revisar)
 router.get('/encuestas/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const usuarioId = req.user.id;
-
   try {
-    // 1. Obtener datos de la encuesta y sus preguntas
-    const [encuestaRes, preguntasRes] = await Promise.all([
-      pool.query(`SELECT e.*, c.nombre as nombre_curso FROM encuestas e JOIN cursos c ON e.id_curso = c.id WHERE e.id = $1`, [id]),
-      pool.query(`SELECT p.id, p.texto, p.tipo_pregunta FROM preguntas p WHERE p.id_encuesta = $1 ORDER BY p.orden`, [id])
-    ]);
-
-    if (encuestaRes.rows.length === 0) return res.status(404).json({ error: "Encuesta no encontrada." });
-    
-    const encuesta = encuestaRes.rows[0];
-    
-    // 2. Validaciones de Acceso (Seguridad)
-    if (encuesta.estado !== 'publicada' && req.user.rol === 2) {
-      return res.status(403).json({ error: "La encuesta no está disponible." });
-    }
-    
-    // Si es Alumno (Rol 2), verificar si está asignado al curso de la encuesta
-    if (req.user.rol === 2) {
-      const asignadoRes = await pool.query(
-        `SELECT 1 FROM curso_usuarios WHERE usuario_id = $1 AND curso_id = $2`,
-        [usuarioId, encuesta.id_curso]
-      );
-      if (asignadoRes.rowCount === 0) {
-        return res.status(403).json({ error: "No tienes permiso para ver esta encuesta." });
-      }
-    }
-    
-    // 3. Verificar si el alumno ya respondió
-    let yaRespondio = false;
-    if (req.user.rol === 2) {
-      const respuestaExistente = await pool.query(
-          `SELECT 1 FROM respuestas r JOIN preguntas p ON r.id_pregunta = p.id 
-           WHERE p.id_encuesta = $1 AND r.id_usuario = $2 LIMIT 1`,
-          [id, usuarioId]
-      );
-      yaRespondio = respuestaExistente.rowCount > 0;
-    }
-
-    res.json({
-      ...encuesta,
-      preguntas: preguntasRes.rows,
-      yaRespondio: yaRespondio
-    });
-
+    const enc = await pool.query("SELECT * FROM encuestas WHERE id = $1", [id]);
+    if (enc.rows.length === 0) return res.status(404).json({ error: "No encontrada" });
+    const pregs = await pool.query("SELECT * FROM preguntas WHERE id_encuesta = $1 ORDER BY orden", [id]);
+    const resp = await pool.query("SELECT 1 FROM respuestas r JOIN preguntas p ON r.id_pregunta = p.id WHERE p.id_encuesta = $1 AND r.id_usuario = $2 LIMIT 1", [id, req.user.id]);
+    res.json({ ...enc.rows[0], preguntas: pregs.rows, yaRespondio: resp.rowCount > 0 });
   } catch (e) {
-    console.error("Error al obtener detalle de encuesta:", e);
-    res.status(500).json({ error: "Error en el servidor al obtener encuesta." });
+    res.status(500).json({ error: "Error al obtener encuesta" });
   }
 });
 
-// Enviar Respuestas (Solo Alumnos)
 router.post('/encuestas/:id/respuestas', authenticateToken, async (req, res) => {
-  const { id } = req.params;
+  if (req.user.rol !== 2) return res.status(403).json({ error: "Solo alumnos" });
   const { respuestas } = req.body;
-  const usuarioId = req.user.id;
-
-  // 1. Solo Alumnos pueden responder encuestas
-  if (req.user.rol !== 2) {
-    return res.status(403).json({ error: "Solo los alumnos pueden responder encuestas." });
-  }
-  
-  if (!respuestas || respuestas.length === 0) {
-    return res.status(400).json({ error: "No se recibieron respuestas." });
-  }
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    // 2. Seguridad: Verificar que el alumno puede responder (curso y estado publicado)
-    const encuestaRes = await client.query(`
-        SELECT e.id_curso, e.estado FROM encuestas e
-        JOIN curso_usuarios cu ON e.id_curso = cu.curso_id
-        WHERE e.id = $1 AND cu.usuario_id = $2 AND e.estado = 'publicada'`,
-        [id, usuarioId]
-    );
-
-    if (encuestaRes.rowCount === 0) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: "Encuesta no disponible o no asignada." });
+    for (const r of respuestas) {
+      await client.query(
+        "INSERT INTO respuestas (id_pregunta, id_usuario, valor_escala, valor_texto) VALUES ($1, $2, $3, $4)",
+        [r.idPregunta, req.user.id, typeof r.valor === 'number' ? r.valor : null, typeof r.valor === 'string' ? r.valor : null]
+      );
     }
-
-    // 3. Procesar y guardar cada respuesta en una transacción
-    const queryPreguntaTipo = await client.query(
-        `SELECT id, tipo_pregunta FROM preguntas WHERE id_encuesta = $1`, [id]
-    );
-    const preguntasMap = queryPreguntaTipo.rows.reduce((map, p) => {
-        map[p.id] = p.tipo_pregunta;
-        return map;
-    }, {});
-    
-    let respuestasGuardadas = 0;
-
-    for (const resp of respuestas) {
-        const tipo = preguntasMap[resp.idPregunta];
-        if (!tipo) continue; // Ignorar respuestas a preguntas inexistentes/no pertenecientes
-
-        let valorEscala = null;
-        let valorTexto = null;
-
-        if (tipo === 'escala_1_5') {
-            valorEscala = resp.valor;
-            if (valorEscala < 1 || valorEscala > 5) throw new Error(`Valor de escala inválido para pregunta ${resp.idPregunta}.`);
-        } else if (tipo === 'texto_libre') {
-            valorTexto = resp.valor;
-            if (!valorTexto || valorTexto.length < 5) throw new Error(`Respuesta de texto libre demasiado corta para pregunta ${resp.idPregunta}.`);
-        }
-        
-        await client.query(
-            `INSERT INTO respuestas (id_pregunta, id_usuario, valor_escala, valor_texto)
-             VALUES ($1, $2, $3, $4)`,
-            [resp.idPregunta, usuarioId, valorEscala, valorTexto]
-        );
-        respuestasGuardadas++;
-    }
-
     await client.query('COMMIT');
-
-    if (respuestasGuardadas === 0) {
-        return res.status(400).json({ message: "No se guardó ninguna respuesta válida." });
-    }
-
-    res.json({ message: "Respuestas guardadas con éxito.", count: respuestasGuardadas });
-
+    res.json({ message: "Respuestas guardadas" });
   } catch (e) {
     await client.query('ROLLBACK');
-    // Error 23505 (Unique Violation) ocurre si intenta responder dos veces
-    if (e.code === '23505') {
-        return res.status(400).json({ error: "Ya has respondido esta encuesta." });
-    }
-    console.error("Error al guardar respuestas:", e);
-    res.status(500).json({ error: "Error en el servidor al guardar respuestas." });
+    res.status(500).json({ error: "Error al guardar" });
   } finally {
     client.release();
   }
 });
 
-// Obtener resultados agregados de una encuesta (Solo Admin y Profesor)
 router.get('/encuestas/:id/resultados', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const usuarioId = req.user.id;
-
+  if (req.user.rol === 2) return res.status(403).json({ error: "Acceso denegado" });
   try {
-    // 1. Verificar si la encuesta existe y obtener datos
-    const encuestaRes = await pool.query(
-        `SELECT id, titulo, descripcion, creado_por FROM encuestas WHERE id = $1`, [id]
-    );
-    if (encuestaRes.rows.length === 0) {
-        return res.status(404).json({ error: "Encuesta no encontrada." });
-    }
-    const encuesta = encuestaRes.rows[0];
-
-    const usuarioRol = req.user.rol;
-    const isCreador = encuesta.creado_por === usuarioId;
-
-    // 2. Seguridad: Solo el creador o un Admin pueden ver los resultados
-    if (usuarioRol === 2) { 
-        return res.status(403).json({ error: "Solo el personal docente/administrativo puede ver resultados." });
-    }
-    if (usuarioRol === 1 && !isCreador) {
-        return res.status(403).json({ error: "No tienes permiso para ver resultados de esta encuesta." });
-    }
-    
-    // 3. Obtener preguntas y sus tipos
-    const preguntasRes = await pool.query(
-        `SELECT id, texto, tipo_pregunta FROM preguntas WHERE id_encuesta = $1 ORDER BY orden`, [id]
-    );
-    const preguntas = preguntasRes.rows;
-    
+    const enc = await pool.query("SELECT titulo, descripcion FROM encuestas WHERE id = $1", [id]);
+    const pregs = await pool.query("SELECT * FROM preguntas WHERE id_encuesta = $1 ORDER BY orden", [id]);
     const resultados = [];
-    
-    // 4. Procesar resultados pregunta por pregunta
-    for (const pregunta of preguntas) {
-        let data;
-        
-        if (pregunta.tipo_pregunta === 'escala_1_5') {
-            // Agregación para preguntas de escala (contar cuántos respondieron 1, 2, 3, etc.)
-            const result = await pool.query(
-                `SELECT r.valor_escala AS valor, COUNT(r.id) AS total
-                 FROM respuestas r
-                 WHERE r.id_pregunta = $1 AND r.valor_escala IS NOT NULL
-                 GROUP BY r.valor_escala
-                 ORDER BY r.valor_escala`,
-                [pregunta.id]
-            );
-            data = result.rows.map(row => ({
-                valor: parseInt(row.valor), 
-                total: parseInt(row.total)
-            }));
-            
-        } else if (pregunta.tipo_pregunta === 'texto_libre') {
-            // Listado para respuestas de texto libre
-            const result = await pool.query(
-                `SELECT r.valor_texto AS texto
-                 FROM respuestas r
-                 WHERE r.id_pregunta = $1 AND r.valor_texto IS NOT NULL`,
-                [pregunta.id]
-            );
-            data = result.rows.map(row => row.texto);
-        }
-        
-        resultados.push({
-            idPregunta: pregunta.id,
-            texto: pregunta.texto,
-            tipo: pregunta.tipo_pregunta,
-            data: data || []
-        });
+    for (const p of pregs.rows) {
+      let data = [];
+      if (p.tipo_pregunta === 'escala_1_5') {
+        const r = await pool.query("SELECT valor_escala as valor, COUNT(*) as total FROM respuestas WHERE id_pregunta = $1 GROUP BY valor_escala", [p.id]);
+        data = r.rows.map(row => ({ valor: parseInt(row.valor), total: parseInt(row.total) }));
+      } else {
+        const r = await pool.query("SELECT valor_texto as texto FROM respuestas WHERE id_pregunta = $1", [p.id]);
+        data = r.rows.map(row => row.texto);
+      }
+      resultados.push({ idPregunta: p.id, texto: p.texto, tipo: p.tipo_pregunta, data });
     }
-
-    res.json({
-        encuesta: { titulo: encuesta.titulo, descripcion: encuesta.descripcion },
-        resultados: resultados
-    });
-
+    res.json({ encuesta: enc.rows[0], resultados });
   } catch (e) {
-    console.error("Error al obtener resultados:", e);
-    res.status(500).json({ error: "Error en el servidor al obtener resultados." });
+    res.status(500).json({ error: "Error al obtener resultados" });
   }
 });
 
-// ================== PSICÓLOGO & CITAS (SOLUCIONES) ==================
+// ================== PSICÓLOGO & CITAS ==================
 
-// 1. Obtener lista de psicólogos
 router.get('/psicologos', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query("SELECT id, nombre, correo FROM usuarios WHERE rol = 3 ORDER BY nombre");
@@ -1102,18 +548,15 @@ router.get('/psicologos', authenticateToken, async (req, res) => {
   }
 });
 
-// 2. LISTA DE ALUMNOS (Ruta que faltaba y causaba error 404 en sidebar)
 router.get('/psicologos/mis-alumnos', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query("SELECT id, rut, nombre, correo FROM usuarios WHERE rol = 2 ORDER BY nombre ASC");
     res.json(result.rows);
   } catch (err) {
-    console.error("Error alumnos:", err);
     res.status(500).json({ error: "Error al cargar alumnos" });
   }
 });
 
-// 3. DISPONIBILIDAD (Bloques 40 min para el alumno)
 router.get('/psicologos/:id/disponibilidad', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { fecha } = req.query; // YYYY-MM-DD
@@ -1138,9 +581,9 @@ router.get('/psicologos/:id/disponibilidad', authenticateToken, async (req, res)
     // Trabajamos con minutos desde medianoche para evitar objetos Date y zonas horarias
     const inicioDia = 9 * 60;  // 09:00 = 540 min
     const finDia = 18 * 60;    // 18:00 = 1080 min
-    
+
     // Bloqueo Almuerzo: 12:40 (760 min) a 14:00 (840 min)
-    const inicioAlmuerzo = 12 * 60 + 40; 
+    const inicioAlmuerzo = 12 * 60 + 40;
     const finAlmuerzo = 14 * 60;
 
     let minutoActual = inicioDia;
@@ -1188,74 +631,44 @@ router.get('/psicologos/:id/disponibilidad', authenticateToken, async (req, res)
   }
 });
 
-// 4. GET CITAS (Inteligente para todos los roles)
 router.get('/citas', authenticateToken, async (req, res) => {
   try {
-    let whereClause = "";
-    const values = [];
-
-    if (req.user.rol === 2) { // Alumno
-      whereClause = "WHERE c.paciente_id = $1";
-      values.push(req.user.id);
-    } else if (req.user.rol === 3) { // Psicólogo
-      whereClause = "WHERE c.psicologo_id = $1";
-      values.push(req.user.id);
-    } else if (req.user.rol === 0) { // Admin
-      if (req.query.psicologo_id) {
-        whereClause = "WHERE c.psicologo_id = $1";
-        values.push(req.query.psicologo_id);
-      }
-    }
+    let where = "", values = [];
+    if (req.user.rol === 2) { where = "WHERE c.paciente_id = $1"; values.push(req.user.id); }
+    else if (req.user.rol === 3) { where = "WHERE c.psicologo_id = $1"; values.push(req.user.id); }
+    else if (req.user.rol === 0 && req.query.psicologo_id) { where = "WHERE c.psicologo_id = $1"; values.push(req.query.psicologo_id); }
 
     const query = `
-      SELECT 
-         c.id, 
-         c.titulo, 
-         c.fecha_hora_inicio AS "start", 
-         c.fecha_hora_fin AS "end",
-         c.notas,
-         c.estado,  
-         c.lugar,
-         pac.nombre AS "pacienteNombre",
-         pac.correo AS "pacienteCorreo",
-         psi.nombre AS "psicologoNombre"
-       FROM citas c
-       LEFT JOIN usuarios pac ON c.paciente_id = pac.id
-       LEFT JOIN usuarios psi ON c.psicologo_id = psi.id
-       ${whereClause}
-       ORDER BY c.fecha_hora_inicio ASC
+      SELECT c.id, c.titulo, c.fecha_hora_inicio AS "start", c.fecha_hora_fin AS "end", c.notas, c.estado, c.lugar,
+             pac.nombre AS "pacienteNombre", pac.correo AS "pacienteCorreo", psi.nombre AS "psicologoNombre"
+      FROM citas c
+      LEFT JOIN usuarios pac ON c.paciente_id = pac.id
+      LEFT JOIN usuarios psi ON c.psicologo_id = psi.id
+      ${where} ORDER BY c.fecha_hora_inicio ASC
     `;
     const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: 'Error al obtener citas' });
+    res.status(500).json({ error: "Error al obtener citas" });
   }
 });
 
-// 5. GET DETALLE CITA
 router.get('/citas/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      `SELECT 
-         c.id, c.titulo AS motivo, c.fecha_hora_inicio AS fecha_hora, c.fecha_hora_fin,
-         c.lugar, c.estado, c.notas,
-         pac.nombre AS nombre_alumno, pac.rut AS rut_alumno,
-         psi.nombre AS nombre_profesor
-       FROM citas c
-       LEFT JOIN usuarios pac ON c.paciente_id = pac.id
-       LEFT JOIN usuarios psi ON c.psicologo_id = psi.id
-       WHERE c.id = $1`,
+      `SELECT c.id, c.titulo AS motivo, c.fecha_hora_inicio AS fecha_hora, c.fecha_hora_fin, c.lugar, c.estado, c.notas,
+              pac.nombre AS nombre_alumno, pac.rut AS rut_alumno, psi.nombre AS nombre_profesor
+       FROM citas c LEFT JOIN usuarios pac ON c.paciente_id = pac.id LEFT JOIN usuarios psi ON c.psicologo_id = psi.id WHERE c.id = $1`,
       [id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Cita no encontrada' });
+    if (result.rows.length === 0) return res.status(404).json({ error: "No encontrada" });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Error en el servidor' });
+    res.status(500).json({ error: "Error servidor" });
   }
 });
 
-// 6. CREAR CITA
 router.post('/citas/crear', authenticateToken, async (req, res) => {
   const { titulo, start, end, notas, nombre_paciente, paciente_id: pidBody, psicologo_id: psiIdBody } = req.body;
   let psicologo_id, paciente_id;
@@ -1274,7 +687,6 @@ router.post('/citas/crear', authenticateToken, async (req, res) => {
     }
   } else if (req.user.rol === 2) { // Alumno
     paciente_id = req.user.id;
-    if (!psiIdBody) return res.status(400).json({ error: 'Falta seleccionar psicólogo' });
     psicologo_id = psiIdBody;
   } else {
     return res.status(403).json({ error: 'Permiso denegado' });
@@ -1346,7 +758,7 @@ router.patch('/citas/:id', authenticateToken, async (req, res) => {
         WHERE c.id = $${idx} AND c.paciente_id = u.id
         RETURNING c.id, c.titulo, c.fecha_hora_inicio, c.fecha_hora_fin, c.estado, c.notas, c.lugar, u.nombre as "pacienteNombre"
     `;
-    
+
     const result = await pool.query(query, values);
 
     if (result.rowCount === 0) return res.status(404).json({ error: "No se pudo actualizar la cita" });
@@ -1362,19 +774,17 @@ router.patch('/citas/:id', authenticateToken, async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Error update cita:", err);
-    res.status(500).json({ error: "Error en el servidor" });
+    res.status(500).json({ error: "Error servidor" });
   }
 });
 
-// 8. BORRAR CITA
 router.delete('/citas/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query('DELETE FROM citas WHERE id = $1', [id]);
-    res.json({ message: 'Cita eliminada' });
+    await pool.query("DELETE FROM citas WHERE id = $1", [id]);
+    res.json({ message: "Eliminada" });
   } catch (err) {
-    res.status(500).json({ error: 'Error al eliminar' });
+    res.status(500).json({ error: "Error al eliminar" });
   }
 });
 
